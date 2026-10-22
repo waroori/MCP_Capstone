@@ -18,8 +18,8 @@ class ApiError(Exception):
         self.code, self.message = code, message
 
 
-def _call(method: str, base: str, path: str, token: str, **kw) -> dict:
-    r = requests.request(method, base + path, headers={"Authorization": "Bearer " + token}, timeout=30, **kw)
+def _call(method: str, base: str, path: str, token: str, headers: dict | None = None, **kw) -> dict:
+    r = requests.request(method, base + path, headers={"Authorization": "Bearer " + token, **(headers or {})}, timeout=30, **kw)
     try:
         body = r.json()
     except ValueError as exc:

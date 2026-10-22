@@ -311,6 +311,17 @@ Table api_keys {
   revoked_at timestamptz
 }
 
+Table key_handoffs {
+  id varchar [pk, note: '링크 토큰 (추측 불가한 임의 문자열)']
+  api_key_id varchar [not null, ref: > api_keys.id]
+  employee_id varchar [not null, ref: > employees.id, note: '이 사람만 열 수 있다']
+  key_prefix varchar [not null, note: 'Slack 안내에 쓰는 키 앞부분']
+  secret varchar [note: '키 전체. 본인이 한 번 열거나 만료되면 NULL']
+  expires_at timestamptz [not null]
+  viewed_at timestamptz
+  Note: 'F4: API 사용 승인 뒤 키를 일회용 링크로 넘긴다. Slack·메일에 키 값을 보내지 않는다'
+}
+
 Table usage_records {
   id bigserial [pk]
   vendor_record_id varchar [not null, unique, note: '벤더 사용량 행 id. 수집 재시도 시 중복 방지']

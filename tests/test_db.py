@@ -96,10 +96,7 @@ def test_grant_and_revoke_change_usable_tools():
     """부여하면 그 직원의 실제 사용 가능 도구에 생기고, 회수하면 사라진다. API 도구는 팀 프로젝트가 있을 때만."""
     assert "tool_chatgpt" not in tools_of("emp_mkt_01")
     assert "tool_claude" in tools_of("emp_cs_01") and "tool_claude" not in tools_of("emp_hrd_01")  # HRD팀은 Claude API 프로젝트가 없다
-    plan = assign("emp_mkt_01").json()["data"]
-    assert plan["status"] == "pending_approval"  # v2.1: 배정도 관리자 승인 뒤 실행
-    client.post(f"/plans/{plan['id']}/approve", headers=ADMIN, json={"reason": "t"})
-    assert client.post(f"/plans/{plan['id']}/execute", headers={**ADMIN, "Idempotency-Key": "as1"}).status_code == 200
+    assert assign("emp_mkt_01").json()["data"]["status"] == "executed"  # F4: 남은 좌석이 있으면 바로 배정
     assert "tool_chatgpt" in tools_of("emp_mkt_01")
     plan = client.post("/plans", headers=ADMIN, json={"type": "seat_reclaim", "items": [{"employee_id": "emp_mkt_01", "contract_id": "ctr_chatgpt_2026"}],
                                                       "rationale": "t", "evidence": []}).json()["data"]
@@ -109,7 +106,8 @@ def test_grant_and_revoke_change_usable_tools():
 
 
 def test_assign_revalidates_before_execute():
-    """중복 배정·휴직자·좌석 초과는 승인 대기에 들어가기 전에 막고(409) 조치안을 failed로 남긴다. 절감 기록은 생기지 않는다."""
+    """중복 배정·휴직자는 승인 대기에 들어가기 전에 막고(409) 조치안을 failed로 남긴다.
+    좌석이 없으면 승인 대기 → 관리자 승인 = 1석 추가 구매(Mock) 후 배정. 좌석 수를 넘지 않고, 구매했으니 절감 기록도 없다."""
     savings = db.one("SELECT count(*) AS n FROM savings_ledger")["n"]
     for emp, why in [("emp_gen_002", "이미"), ("emp_gen_007", "on_leave")]:
         r = assign(emp)
@@ -118,8 +116,34 @@ def test_assign_revalidates_before_execute():
     with db.tx() as c:  # 좌석을 꽉 채운 상태로 만든다 (구매 수 = 배정 수)
         c.execute(db.text("UPDATE contracts SET seats_purchased = 58 WHERE id = 'ctr_chatgpt_2026'"))
     r = assign("emp_mkt_01")
-    assert r.status_code == 409 and "남은 좌석 0석" in r.json()["error"]["message"]
+    plan = r.json()["data"]
+    assert r.status_code == 201 and plan["status"] == "pending_approval"
+    assert any(e["value"].get("on_approve") == "1석 추가 구매(Mock) 후 배정" for e in plan["evidence"] if isinstance(e["value"], dict))
+    client.post(f"/plans/{plan['id']}/approve", headers=ADMIN, json={"reason": "t"})
+    done = client.post(f"/plans/{plan['id']}/execute", headers={**ADMIN, "Idempotency-Key": "buy1"}).json()["data"]["plan"]
+    assert done["status"] == "executed" and done["result"]["purchased_seats"] == {"ctr_chatgpt_2026": 1}
+    seats = db.one("SELECT c.seats_purchased AS p, count(s.id) AS used FROM contracts c JOIN seat_assignments s ON s.contract_id = c.id AND s.status = 'assigned'"
+                   " WHERE c.id = 'ctr_chatgpt_2026' GROUP BY c.id")
+    assert seats["p"] == seats["used"] == 59   # 산 만큼만 배정
     assert db.one("SELECT count(*) AS n FROM savings_ledger")["n"] == savings
+
+
+def test_api_access_hands_key_over_once():
+    """API 사용 승인 → 개인 테스트 프로젝트·키 생성, 키는 본인만 한 번 (Slack에는 앞부분만)."""
+    emp = {"Authorization": "Bearer dev.emp_md_01"}
+    plan = client.post("/plans", headers=emp, json={"type": "api_access", "items": [{"tool_id": "tool_claude", "purpose": "리뷰 요약 자동화"}],
+                                                    "rationale": "t", "evidence": []}).json()["data"]
+    client.post(f"/plans/{plan['id']}/approve", headers=ADMIN, json={"reason": "t"})
+    done = client.post(f"/plans/{plan['id']}/execute", headers={**ADMIN, "Idempotency-Key": "ak1"}).json()["data"]["plan"]
+    h = done["result"]["handoffs"][0]
+    assert "secret" not in h and h["key_prefix"].startswith("sk-mock-")
+    url = f"/keys/handoff/{h['handoff_id']}/reveal"
+    assert client.post(url, headers=ADMIN).status_code == 404      # 관리자도 남의 키는 못 본다
+    got = client.post(url, headers=emp).json()["data"]
+    assert got["secret"].startswith(h["key_prefix"]) and got["product"] == "Claude API"
+    assert client.post(url, headers=emp).status_code == 409        # 두 번째는 안 됨
+    assert db.one("SELECT secret FROM key_handoffs WHERE id = :id", id=h["handoff_id"])["secret"] is None
+    assert db.one("SELECT owner_id, environment FROM projects WHERE id = :id", id=h["project_id"]) == {"owner_id": "emp_md_01", "environment": "test"}
 
 
 SEED_CHECKS = {  # 시드 일관성: 모두 0건이어야 한다

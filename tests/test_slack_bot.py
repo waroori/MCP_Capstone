@@ -237,10 +237,11 @@ def test_worker_notifies_requester_after_web_decision(monkeypatch):
         if path == "/tools":
             return [{"id": "tool_chatgpt", "product": "ChatGPT Enterprise", "contract": {"id": "ctr_chatgpt_2026"}}, {"id": "tool_claude", "product": "Claude API", "contract": None}]
         if path == "/employees/emp_md_01":
-            return {"employee": {"id": "emp_md_01", "name": "정서진", "role": "employee", "slack_user_id": "U_MD01"}, "tasks": [], "products": []}
+            return {"employee": {"id": "emp_md_01", "name": "정서진", "dept_name": "상품기획·MD", "role": "employee", "slack_user_id": "U_MD01", "email": "seojin.jung@hanbit.example"}, "tasks": [], "products": []}
         raise AssertionError(path)
     monkeypatch.setattr(api, "backend", backend)
     monkeypatch.setattr(identity, "_user_map", lambda: {"U0REAL0002": "emp_md_01"})
+    monkeypatch.setattr(identity, "admin_slack_ids", lambda: ["U0ADMIN001"])
     worker._plan_status.clear(); worker._tool_cache.clear(); worker._emp_cache.clear()
     slack = FakeSlack()
     assert worker.notify_plan_outcomes(slack, baseline=True) == [] and slack.posted == []  # 기동 시점: 이미 끝난 plan_old는 알리지 않음
@@ -249,14 +250,25 @@ def test_worker_notifies_requester_after_web_decision(monkeypatch):
     plans[2]["status"], plans[2]["reject_reason"] = "rejected", "팀 프로젝트로 이미 쓸 수 있음"
     assert worker.notify_plan_outcomes(slack) == ["plan_new", "plan_rej"]
     texts = [m["text"] for m in slack.posted]
-    assert texts[0] == "요청하신 ChatGPT Enterprise 이용권이 배정됐어요. 지금부터 쓸 수 있어요." and all(c == "D_U0REAL0002" for c in [m["channel"] for m in slack.posted])
+    assert texts[0].startswith("요청하신 ChatGPT Enterprise 이용권이 배정됐어요. 지금부터 쓸 수 있어요.") and all(c == "D_U0REAL0002" for c in [m["channel"] for m in slack.posted])
+    assert "seojin.jung@hanbit.example" in texts[0] and "비밀번호: 따로 없어요" in texts[0] and "https://chatgpt.com" in texts[0]  # SSO 안내, 비밀번호 없음
     assert "Claude API 요청이 반려됐어요" in texts[1] and "팀 프로젝트로 이미 쓸 수 있음" in texts[1]
     assert worker.notify_plan_outcomes(slack) == [] and len(slack.posted) == 2  # 두 번 보내지 않음
+    # 기동 뒤 새로 들어온 승인 대기 → 관리자 DM에 [승인]/[반려]
+    plans.append({"id": "plan_full", "type": "seat_assign", "status": "pending_approval", "requested_by": "emp_md_01", "items": [{"employee_id": "emp_md_01", "contract_id": "ctr_chatgpt_2026"}],
+                  "evidence": [{"source": "inventory", "ref": "ctr_chatgpt_2026", "value": {"unassigned": 0, "on_approve": "1석 추가 구매(Mock) 후 배정"}}]})
+    worker.notify_plan_outcomes(slack)
+    ask = slack.posted[-1]
+    assert ask["channel"] == "D_U0ADMIN001" and "남은 좌석이 없어요" in ask["blocks"][0]["text"]["text"] and "1석 추가 구매" in ask["blocks"][0]["text"]["text"]
+    assert [b["action_id"] for b in ask["blocks"][1]["elements"]] == ["pl_yes", "pl_no"] and ask["blocks"][1]["elements"][0]["value"] == "plan_full"
 
 
 def test_outcome_messages_cover_reclaim_holder_and_requester():
     from apps.slack_bot import worker
-    names = {"ctr_chatgpt_2026": "ChatGPT Enterprise"}
+    names = {"ctr_chatgpt_2026": "ChatGPT Enterprise", "tool_claude": "Claude API"}
+    m = worker.outcome_messages({"type": "api_access", "status": "executed", "requested_by": "emp_md_01", "items": [{"tool_id": "tool_claude", "purpose": "x"}],
+                                 "result": {"handoffs": [{"handoff_id": "kh_abc", "key_prefix": "sk-mock-AbCd"}]}}, names)
+    assert "sk-mock-AbCd" in m["emp_md_01"] and "/key/kh_abc" in m["emp_md_01"] and "한 번" in m["emp_md_01"]  # 키 전체는 Slack에 없음
     m = worker.outcome_messages({"type": "seat_reclaim", "status": "executed", "requested_by": "emp_asset_01", "items": [{"employee_id": "emp_gen_052", "contract_id": "ctr_chatgpt_2026"}]}, names)
     assert "반납 처리됐어요" in m["emp_gen_052"] and "반납 처리가 끝났어요" in m["emp_asset_01"]
     m = worker.outcome_messages({"type": "seat_assign", "status": "failed", "requested_by": "emp_md_01", "items": [{"employee_id": "emp_md_01", "contract_id": "ctr_chatgpt_2026"}]}, names)

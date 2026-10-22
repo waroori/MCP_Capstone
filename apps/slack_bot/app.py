@@ -97,6 +97,25 @@ def on_approval(ack, body, action, client):
         threading.Thread(target=_follow, args=(client, ctx["token"], task_id, ctx["channel"], ctx["ts"], ctx["thread_ts"], ctx["after"], ctx.get("is_admin", False)), daemon=True).start()
 
 
+def on_plan_decision(ack, body, action, client):
+    """관리자 DM의 [승인]/[반려] → 처리 요청을 승인하고 바로 실행(높은 위험은 승인만). 요청자 안내는 워커가 결과를 보고 보낸다."""
+    ack()
+    approve, plan_id, user, channel = action["action_id"] == "pl_yes", action["value"], body["user"]["id"], body["channel"]["id"]
+    try:
+        token, emp = identity.resolve(user)
+        if emp.get("role") != "admin":
+            client.chat_postEphemeral(channel=channel, user=user, text="관리자만 결정할 수 있어요.")
+            return
+        plan = api.backend("POST", f"/plans/{plan_id}/{'approve' if approve else 'reject'}", token, json={"reason": "Slack에서 " + ("승인" if approve else "반려")})
+        if approve and plan["risk_level"] != "high":
+            plan = api.backend("POST", f"/plans/{plan_id}/execute", token, headers={"Idempotency-Key": f"slack_{plan_id}"})["plan"]
+    except api.ApiError as exc:
+        client.chat_postEphemeral(channel=channel, user=user, text=friendly(exc))
+        return
+    done = {"executed": "승인하고 처리했어요. 요청자에게 안내를 보냈어요.", "approved": "승인했어요. 실행은 책임자 결정 뒤에 해요.", "rejected": "반려했어요. 요청자에게 알렸어요."}
+    client.chat_update(channel=channel, ts=body["message"]["ts"], text=done.get(plan["status"], plan["status"]), blocks=[])
+
+
 def on_seat_analyze(ack, body, action, client):
     """경보 DM의 [현재 작업 분석] → 본인 권한으로 에이전트 analyze_seat_usage를 돌려 같은 스레드에 답한다."""
     ack()
@@ -142,6 +161,8 @@ def create_app(verify_token: bool = True) -> App:
     for aid in ("ap_yes", "ap_no"):
         app.action(aid)(on_approval)
     app.action("seat_analyze")(on_seat_analyze)
+    for aid in ("pl_yes", "pl_no"):
+        app.action(aid)(on_plan_decision)
     return app
 
 

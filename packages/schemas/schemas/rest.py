@@ -317,6 +317,15 @@ class SeatPaceDetail(BaseModel):
     by_model: list[BreakdownRow] = []
 
 
+class KeyReveal(BaseModel):
+    """API 사용 승인 뒤 발급한 키를 본인이 한 번만 보는 링크의 결과. 열고 나면 서버에서 키 값을 지운다."""
+    product: str
+    project_name: str
+    key_prefix: str = Field(description="키 앞부분. Slack 안내에도 같은 값이 나가 본인 키인지 맞춰 본다")
+    secret: str = Field(description="키 전체. 이 응답에서 한 번만 준다")
+    expires_at: datetime
+
+
 # ---------- /plans ----------
 class PlanCreate(BaseModel):
     type: PlanType
@@ -408,6 +417,7 @@ ROUTES: list[tuple[str, str, str, list[Role]]] = [
     ("PUT", "/budgets", "연간 예산 설정", [Role.admin]),
     ("GET", "/usage/seats", "좌석별 오늘 토큰 소비 속도", [Role.admin, Role.system]),
     ("GET", "/usage/seats/{employee_id}", "좌석 소비 속도 상세 (직원은 본인만)", [Role.employee, Role.admin, Role.system]),
+    ("POST", "/keys/handoff/{handoff_id}/reveal", "발급된 API 키를 본인이 한 번만 확인 (24시간)", [Role.employee, Role.admin]),
     ("GET", "/plans", "조치안 목록", [Role.employee, Role.admin, Role.system]),
     ("POST", "/plans", "처리 요청 생성. 모든 요청은 승인 대기(pending_approval). 직원: seat_assign·seat_reclaim(본인), api_access, model_change(본인 소유 프로젝트, test)", [Role.employee, Role.admin, Role.system]),
     ("GET", "/plans/{plan_id}", "조치안 상태", [Role.employee, Role.admin, Role.system]),

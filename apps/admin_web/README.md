@@ -20,6 +20,7 @@ npm run build      # dist/
 | `/licenses` | 구독·이용권 | F4 |
 | `/suggestions` | 자동 제안 기록 | F1 |
 | `/assistant` | **AI 비서에게 묻기** (진행 스트림, 내 요청) | 전체 |
+| `/key/:id` | 직원용 API 키 확인 (Slack 일회용 링크, 사이드바 없음, [키 보기]를 눌러야 한 번만 열림) | F4 |
 
 ## 구조
 - `src/request.js` — fetch 공통(`/api/*`), 토큰(`POST /auth/login` JWT를 `localStorage.token`에, 없거나 401이면 `/login`), `login`·`devLogin`(개발 서버 전용)·`logout`, SSE 스트리밍(`streamTask`), 에이전트 작업 API.

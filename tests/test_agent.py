@@ -63,7 +63,10 @@ def test_profile_question_runs_to_done_with_evidence(client):
 
 
 def test_employee_seat_request_waits_for_admin(client):
-    """직원 사용 신청: 의도 분류 → create_action_plan → 승인 대기. 에이전트는 실행하지 않고 '전달했어요'라고 답한다."""
+    """직원 사용 신청: 의도 분류 → create_action_plan → 좌석이 없으면 승인 대기. 에이전트는 실행하지 않고 '전달했어요'라고 답한다."""
+    from apps.backend import db
+    with db.tx() as c:  # 좌석을 꽉 채워 승인 대기로 들어가게 한다 (남으면 바로 배정)
+        c.execute(db.text("UPDATE contracts SET seats_purchased = (SELECT count(*) FROM seat_assignments WHERE contract_id = 'ctr_chatgpt_2026' AND status = 'assigned') WHERE id = 'ctr_chatgpt_2026'"))
     task_id = client.post("/ai/tasks", json={"input": "AI-A 이용권 신청하고 싶어요", "channel": "slack"}, headers=EMP).json()["data"]["task_id"]
     evs = events(client, task_id, EMP)
     ends = [e for e in evs if e["type"] == "TOOL_END"]
@@ -175,6 +178,9 @@ def test_admin_web_answer_keeps_evidence_line(client):
 
 def test_plan_creation_triggers_review_with_opinion(client):
     """직원 요청으로 처리 요청이 생기면 시스템 계정 검토가 돌아 ai_opinion이 붙는다 (관리자 승인 전)."""
+    from apps.backend import db
+    with db.tx() as c:  # 좌석을 꽉 채워 승인 대기로 들어가게 한다 (남으면 바로 배정)
+        c.execute(db.text("UPDATE contracts SET seats_purchased = (SELECT count(*) FROM seat_assignments WHERE contract_id = 'ctr_chatgpt_2026' AND status = 'assigned') WHERE id = 'ctr_chatgpt_2026'"))
     from apps.backend.main import app as backend_app
     from fastapi.testclient import TestClient as BackendClient
     task_id = client.post("/ai/tasks", json={"input": "AI-A 이용권 신청하고 싶어요", "channel": "slack"}, headers=EMP).json()["data"]["task_id"]

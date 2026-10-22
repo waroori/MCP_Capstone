@@ -31,7 +31,7 @@ const groups = [
 const signOut = () => { logout(); me.value = { name: '', role: '' }; router.push('/login') }
 // 처리 요청을 승인·생성하면 배지가 바뀌므로 화면을 옮길 때마다 다시 센다. 로그인 화면에서는 부르지 않는다.
 watch(() => route.fullPath, async (_, prev) => {
-  if (route.meta.public || !loggedIn()) return
+  if (route.meta.public || route.meta.bare || !loggedIn()) return
   if (!me.value.employee) getMe().then((v) => (me.value = v)).catch(() => {})
   counts.value = await getCounts()
   if (prev) { await nextTick(); mainEl.value?.focus() }
@@ -39,7 +39,7 @@ watch(() => route.fullPath, async (_, prev) => {
 </script>
 
 <template>
-  <RouterView v-if="route.meta.public" />
+  <RouterView v-if="route.meta.public || route.meta.bare" />
   <template v-else>
   <a class="skip" href="#main">본문으로 건너뛰기</a>
   <div class="layout">

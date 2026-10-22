@@ -76,6 +76,27 @@ def send_approval_request(client, channel: str, task: dict, web_url: str | None 
     return client.chat_postMessage(channel=channel, text="AI 비서 처리 확인 요청", blocks=build_approval_request(task, web_url))
 
 
+# ---------- 4-1. 처리 요청 승인 (관리자 DM, F4) ----------
+def build_plan_request(plan: dict, who: str, product: str, web_url: str | None = None) -> list[dict]:
+    """직원 신청이 승인 대기로 들어오면 관리자에게. 승인하면 실행까지, 결과 안내는 워커가 요청자에게 보낸다."""
+    item = (plan.get("items") or [{}])[0]
+    if plan["type"] == "seat_assign":
+        buy = next((e["value"]["on_approve"] for e in plan.get("evidence", []) if isinstance(e.get("value"), dict) and e["value"].get("on_approve")), None)
+        head, what = "이용권 신청", f"남은 좌석이 없어요. 승인하면 {buy or '좌석을 추가 구매(Mock)한 뒤 배정'}합니다." if buy else "승인하면 바로 배정합니다."
+    elif plan["type"] == "api_access":
+        head, what = "API 사용 신청", f"용도: {item.get('purpose', '-')}\n승인하면 개인 테스트 프로젝트와 키를 만들고, 키는 본인만 한 번 볼 수 있는 링크로 보냅니다."
+    elif plan["type"] == "seat_reclaim":
+        head, what = "이용권 반납", "승인하면 좌석을 회수합니다."
+    else:
+        head, what = "처리 요청", plan.get("rationale", "")
+    opinion = (plan.get("ai_opinion") or {}).get("summary")
+    link = f"\n<{web_url}|웹 콘솔에서 자세히 보기>" if web_url else ""
+    return [
+        _section(f"*{head}* · {who} → {product}\n{what}" + (f"\nAI 의견: {opinion}" if opinion else "") + link),
+        _buttons([("승인", "pl_yes", plan["id"], "primary"), ("반려", "pl_no", plan["id"], "danger")]),
+    ]
+
+
 # ---------- 5. 좌석 토큰 소비 경보 (F3, 본인에게만) ----------
 def build_seat_alert(anomaly: dict) -> list[dict]:
     return [

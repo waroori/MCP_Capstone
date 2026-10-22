@@ -2,7 +2,8 @@
 
 1) 사용 의사 확인 요청(미응답) → 직원 DM (계속 필요·반납·휴직 버튼)               [F4]
 2) 발송함(notify_outbox, 미전달) → 직원 DM 또는 부서원 DM (활용 제안 + 반응 버튼)   [F1]
-3) 처리 요청 결과 → 요청자 DM: 봇이 뜬 뒤 상태가 executed·rejected·failed로 바뀐 건만 (과거 건은 재알림 없음)   [F4]
+3) 처리 요청: 새 승인 대기 → 관리자 DM([승인]/[반려]), 결과(executed·rejected·failed) → 요청자 DM과 사용 안내   [F4]
+   좌석 제품은 SSO 로그인 안내(아이디=회사 이메일, 비밀번호 없음), API는 키 앞부분 + 본인만 한 번 여는 링크. 키 값은 Slack에 보내지 않는다
 5) F3 좌석 토큰 경보: 사용량 수집 → 소비 속도 경보 배치 → 새 경보를 본인 DM (현재 작업 분석 버튼). F3_INTERVAL_MIN(기본 5분)마다
 4) F1 체인 한 바퀴: 수집 배치 → 검토 안 된 업데이트마다 에이전트 review_update(시스템 계정)
    → 발송 정책 배치(팀당 주 2건·업무 시간·보류) → 2)
@@ -25,10 +26,11 @@ from pathlib import Path
 
 from apps.slack_bot import client as api
 from apps.slack_bot import identity
-from apps.slack_bot.send import send_confirmation, send_seat_alert, send_suggestion
+from apps.slack_bot.send import build_plan_request, send_confirmation, send_seat_alert, send_suggestion
 
 log = logging.getLogger("slack_bot.worker")
 SYSTEM_TOKEN = os.getenv("SYSTEM_TOKEN", "dev.sys")
+WEB_URL = os.getenv("WEB_URL", "http://localhost:5173")
 STATE_PATH = Path(os.getenv("SLACK_WORKER_STATE", "logs/slack_worker_state.json"))
 REAL_SLACK_ID = re.compile(r"^[UW][A-Z0-9]{8,}$")
 _emp_cache: dict[str, dict] = {}
@@ -206,8 +208,36 @@ def _product_names() -> dict[str, str]:
     return _tool_cache
 
 
-def outcome_messages(plan: dict, names: dict[str, str]) -> dict[str, str]:
-    """처리 요청 결과를 받을 사람(직원 id) → 자연어 안내. 요청자와, 좌석이 바뀌는 당사자."""
+# 좌석 제품 로그인 안내 (제품 이름에 들어가는 말 → 접속 주소, 로그인 방법). 모두 회사 SSO라 비밀번호를 따로 주지 않는다
+SEAT_GUIDE = {
+    "ChatGPT": ("https://chatgpt.com", "회사 이메일을 넣고 'SSO로 계속'을 누르세요"),
+    "Acrobat": ("https://acrobat.adobe.com", "'회사 또는 학교 계정'을 고르고 회사 이메일을 넣으세요"),
+    "Canva": ("https://www.canva.com/login", "'SSO로 로그인'을 누르고 회사 이메일을 넣으세요"),
+}
+
+
+def seat_guide(product: str, email: str | None) -> str:
+    url, how = next((v for k, v in SEAT_GUIDE.items() if k in product), (None, "회사 SSO로 로그인하세요"))
+    return "\n".join(filter(None, [
+        f"• 접속: {url}" if url else None,
+        f"• 아이디: 회사 이메일{f' ({email})' if email else ''}",
+        "• 비밀번호: 따로 없어요. 평소 쓰는 회사 계정(SSO)으로 로그인해요",
+        f"• 방법: {how}",
+    ]))
+
+
+def access_guide(product: str, handoff: dict | None) -> str:
+    if not handoff:
+        return f"요청하신 {product} 사용이 승인됐어요. 접근 정보는 담당자가 따로 안내할 거예요."
+    return (f"요청하신 {product} API 사용이 승인됐어요. 개인 테스트 프로젝트와 키를 만들었어요.\n"
+            f"• 키 앞부분: `{handoff['key_prefix']}…`\n"
+            f"• 키 전체는 본인만 한 번 볼 수 있어요 (24시간): {WEB_URL}/key/{handoff['handoff_id']}\n"
+            "• 키는 Slack·메일·코드 저장소에 붙여 넣지 말고 환경변수나 사내 비밀 저장소에 두세요")
+
+
+def outcome_messages(plan: dict, names: dict[str, str], emails: dict[str, str] | None = None) -> dict[str, str]:
+    """처리 요청 결과를 받을 사람(직원 id) → 자연어 안내. 요청자와, 좌석이 바뀌는 당사자. emails: 직원 id → 회사 이메일(SSO 아이디)."""
+    emails = emails or {}
     item = (plan.get("items") or [{}])[0]
     product = names.get(item.get("contract_id") or item.get("tool_id") or "", "요청하신 제품")
     status, typ, req = plan["status"], plan["type"], plan["requested_by"]
@@ -220,7 +250,7 @@ def outcome_messages(plan: dict, names: dict[str, str]) -> dict[str, str]:
     elif status == "executed":
         holder = item.get("employee_id")
         if typ == "seat_assign":
-            out[holder or req] = f"요청하신 {product} 이용권이 배정됐어요. 지금부터 쓸 수 있어요."
+            out[holder or req] = f"요청하신 {product} 이용권이 배정됐어요. 지금부터 쓸 수 있어요.\n" + seat_guide(product, emails.get(holder or req))
             if holder and holder != req:
                 out[req] = f"{product} 이용권 배정이 끝났어요."
         elif typ == "seat_reclaim":
@@ -229,7 +259,7 @@ def outcome_messages(plan: dict, names: dict[str, str]) -> dict[str, str]:
             if req != holder:
                 out[req] = f"{product} 이용권 반납 처리가 끝났어요."
         elif typ == "api_access":
-            out[req] = f"요청하신 {product} 사용이 승인됐어요. 접근 정보는 담당자가 따로 안내할 거예요."
+            out[req] = access_guide(product, next(iter((plan.get("result") or {}).get("handoffs") or []), None))
         elif typ == "model_change":
             out[req] = "요청하신 모델 변경이 반영됐어요."
         else:
@@ -245,10 +275,15 @@ def notify_plan_outcomes(client, baseline: bool = False) -> list[str]:
     for plan in plans:
         before = _plan_status.get(plan["id"])
         _plan_status[plan["id"]] = plan["status"]
+        if not baseline and before is None and plan["status"] == "pending_approval":
+            ask_admins(client, plan)  # 기준선 뒤 새로 들어온 승인 대기 → 관리자 DM
+            continue
         if baseline or plan["status"] not in FINAL or before == plan["status"]:
             continue  # 기준선 이후 바뀐 건만. 기준선 뒤 새로 생겨 바로 끝난 건(before None)도 알린다
         try:
-            for emp_id, text in outcome_messages(plan, _product_names()).items():
+            item = (plan.get("items") or [{}])[0]
+            emails = {e: employee(e).get("email") for e in {plan["requested_by"], item.get("employee_id")} if e}
+            for emp_id, text in outcome_messages(plan, _product_names(), emails).items():
                 emp = employee(emp_id)
                 if emp.get("role") != "employee":
                     continue  # 관리자 본인 건은 웹에서 보고 있다
@@ -261,6 +296,22 @@ def notify_plan_outcomes(client, baseline: bool = False) -> list[str]:
         except Exception as exc:  # noqa: BLE001
             log.warning("처리 결과 %s 알림 실패: %s", plan["id"], exc)
     return sent
+
+def ask_admins(client, plan: dict) -> None:
+    """직원이 낸 승인 대기 요청을 관리자에게 DM ([승인]/[반려]). 관리자가 직접 만든 요청은 웹에서 보고 있으니 보내지 않는다."""
+    try:
+        req = employee(plan["requested_by"])
+        if req.get("role") != "employee":
+            return
+        item = (plan.get("items") or [{}])[0]
+        product = _product_names().get(item.get("contract_id") or item.get("tool_id") or "", "제품")
+        blocks = build_plan_request(plan, f"{req['name']}({req.get('dept_name', '')})", product, f"{WEB_URL}/inbox?id={plan['id']}")
+        for admin in identity.admin_slack_ids():
+            client.chat_postMessage(channel=_dm(client, admin), text=f"{req['name']} 님 요청 승인 대기", blocks=blocks)
+        log.info("승인 대기 → 관리자 DM: %s", plan["id"])
+    except Exception as exc:  # noqa: BLE001
+        log.warning("승인 대기 %s 관리자 알림 실패: %s", plan["id"], exc)
+
 
 # ---------- 5) F3 좌석 토큰 경보 ----------
 def run_f3(client, state: dict) -> list[str]:

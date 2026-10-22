@@ -4499,6 +4499,105 @@
         }
       }
     },
+    "/keys/handoff/{handoff_id}/reveal": {
+      "post": {
+        "tags": [
+          "F4"
+        ],
+        "summary": "Reveal Key",
+        "description": "본인만, 한 번만, 24시간 안에. 열면 서버에서 키 값을 지운다.",
+        "operationId": "reveal_key_keys_handoff__handoff_id__reveal_post",
+        "parameters": [
+          {
+            "name": "handoff_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handoff Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_KeyReveal_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
     "/plans/{plan_id}/execute": {
       "post": {
         "tags": [
@@ -7014,6 +7113,22 @@
         ],
         "title": "Envelope[JobRunResponse]"
       },
+      "Envelope_KeyReveal_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/KeyReveal"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[KeyReveal]"
+      },
       "Envelope_MeResponse_": {
         "properties": {
           "data": {
@@ -7750,6 +7865,43 @@
           "result"
         ],
         "title": "JobRunResponse"
+      },
+      "KeyReveal": {
+        "properties": {
+          "product": {
+            "type": "string",
+            "title": "Product"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "key_prefix": {
+            "type": "string",
+            "title": "Key Prefix",
+            "description": "키 앞부분. Slack 안내에도 같은 값이 나가 본인 키인지 맞춰 본다"
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret",
+            "description": "키 전체. 이 응답에서 한 번만 준다"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product",
+          "project_name",
+          "key_prefix",
+          "secret",
+          "expires_at"
+        ],
+        "title": "KeyReveal",
+        "description": "API 사용 승인 뒤 발급한 키를 본인이 한 번만 보는 링크의 결과. 열고 나면 서버에서 키 값을 지운다."
       },
       "LicenseFlag": {
         "type": "string",

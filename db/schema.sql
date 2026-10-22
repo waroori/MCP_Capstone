@@ -215,6 +215,17 @@ CREATE TABLE api_keys (
   revoked_at timestamptz
 );
 
+-- F4: API 사용 승인 뒤 키를 본인에게 넘기는 일회용 링크. 본인이 한 번 열면 secret을 지운다 (Slack에는 키 앞부분만)
+CREATE TABLE key_handoffs (
+  id varchar PRIMARY KEY,
+  api_key_id varchar NOT NULL REFERENCES api_keys(id),
+  employee_id varchar NOT NULL REFERENCES employees(id),
+  key_prefix varchar NOT NULL,
+  secret varchar,
+  expires_at timestamptz NOT NULL,
+  viewed_at timestamptz
+);
+
 CREATE TABLE usage_records (
   id bigserial PRIMARY KEY,
   vendor_record_id varchar NOT NULL UNIQUE,

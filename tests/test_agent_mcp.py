@@ -90,6 +90,9 @@ def test_execute_via_mcp_with_approval(client):
 
 
 def test_seat_assign_via_mcp_waits_for_admin(client):
+    from apps.backend import db
+    with db.tx() as c:  # 좌석을 꽉 채워 승인 대기로 들어가게 한다 (남으면 바로 배정)
+        c.execute(db.text("UPDATE contracts SET seats_purchased = (SELECT count(*) FROM seat_assignments WHERE contract_id = 'ctr_chatgpt_2026' AND status = 'assigned') WHERE id = 'ctr_chatgpt_2026'"))
     task_id = client.post("/ai/tasks", json={"input": "박지후 님 ChatGPT Enterprise 이용권 배정해줘"}, headers=ASSET).json()["data"]["task_id"]
     evs = events(client, task_id, ASSET)
     ends = [e for e in evs if e["type"] == "TOOL_END"]
@@ -98,8 +101,9 @@ def test_seat_assign_via_mcp_waits_for_admin(client):
 
 
 def test_employee_seat_request_through_mcp(client):
+    """좌석이 남아 있으면 신청 즉시 시스템이 배정한다."""
     task_id = client.post("/ai/tasks", json={"input": "이용권 신청", "channel": "slack"}, headers=EMP).json()["data"]["task_id"]
     evs = events(client, task_id, EMP)
     ends = [e for e in evs if e["type"] == "TOOL_END"]
     assert [e["tool_call"]["name"] for e in ends] == ["create_action_plan"] and evs[-1]["type"] == "DONE"
-    assert json.loads(ends[0]["tool_call"]["output"])["status"] == "pending_approval"
+    assert json.loads(ends[0]["tool_call"]["output"])["status"] == "executed"

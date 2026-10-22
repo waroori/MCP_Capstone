@@ -14,6 +14,7 @@ const routes = [
   { path: '/seats', name: 'seats', component: () => import('./views/SeatsView.vue'), meta: { title: '좌석 배치도' } },
   { path: '/suggestions', name: 'suggestions', component: () => import('./views/SuggestionsView.vue'), meta: { title: '자동 제안 기록' } },
   { path: '/assistant', name: 'assistant', component: () => import('./views/AssistantView.vue'), meta: { title: 'AI 비서' } },
+  { path: '/key/:id', name: 'key', component: () => import('./views/KeyView.vue'), meta: { title: 'API 키 확인', bare: true } }, // 직원용: 사이드바 없이
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

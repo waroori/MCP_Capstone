@@ -56,21 +56,14 @@ def test_suggestion_requires_relevance_unless_on_hold():
     assert client.post("/suggestions", json={**hold, "hold_reason": ""}, headers=SYS).status_code == 422
 
 
-def test_every_agent_plan_waits_for_admin():
-    """v2.1: 에이전트가 만드는 처리 요청은 전부 승인 대기. 즉시 실행되는 유형이 없다."""
+def test_seat_request_auto_when_seats_left_else_admin():
+    """F4: 좌석이 남으면 시스템이 바로 배정, API 사용·반납은 승인 대기."""
     body = {"type": "seat_assign", "items": [{"employee_id": "emp_mkt_01", "contract_id": "ctr_chatgpt_2026"}], "rationale": "사용 신청", "evidence": []}
     d = client.post("/plans", json=body, headers=EMP).json()["data"]
-    assert d["risk_level"] == "medium" and d["status"] == "pending_approval" and d["executed_at"] is None
+    assert d["status"] == "executed" and d["approver_id"] == "sys" and d["executed_at"]
     api = {"type": "api_access", "items": [{"tool_id": "tool_claude", "purpose": "세일즈 데이터 자동 분석"}], "rationale": "API 사용 신청", "evidence": []}
     d = client.post("/plans", json=api, headers=EMP).json()["data"]
     assert d["status"] == "pending_approval"
-    # 반납은 좌석이 있어야 한다: 위 배정 요청을 관리자가 승인·실행한 뒤 본인 반납 요청
-    first = client.post("/plans", json=body, headers=EMP).json()
-    pid = first["data"]["id"] if "data" in first else first["error"]["details"]["plan_id"]
-    pending = [p for p in client.get("/plans", params={"type": "seat_assign", "status": "pending_approval"}, headers=ASSET).json()["data"]["items"] if p["requested_by"] == "emp_mkt_01"]
-    pid = pending[0]["id"]
-    assert client.post(f"/plans/{pid}/approve", json={"reason": "t"}, headers=ASSET).status_code == 200
-    assert client.post(f"/plans/{pid}/execute", headers={**ASSET, "Idempotency-Key": f"k_{pid}"}).status_code == 200
     mine = {"type": "seat_reclaim", "items": [{"employee_id": "emp_mkt_01", "contract_id": "ctr_chatgpt_2026"}], "rationale": "본인 반납", "evidence": []}
     assert client.post("/plans", json=mine, headers=EMP).status_code == 201
     other = {"type": "seat_reclaim", "items": [{"employee_id": "emp_cs_01", "contract_id": "ctr_chatgpt_2026"}], "rationale": "x", "evidence": []}
