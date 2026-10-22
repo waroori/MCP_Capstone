@@ -175,3 +175,42 @@ def test_model_change_execute_applies_and_revalidates():
     assert db.one("SELECT model_id FROM projects WHERE id = 'prj_faq'")["model_id"] == "anthropic:claude-haiku-5-5"
     r = run("mc2")
     assert r.status_code == 409 and "이미" in r.json()["error"]["message"]
+
+
+def test_new_hire_registered_and_placed_on_desk():
+    """신입 등록(Slack 회원 ID 포함) → 빈 책상에 앉히기 → 옮기기. 남의 자리는 막고, 모자라면 책상을 붙인다."""
+    desks = client.get("/desks", headers=ADMIN).json()["data"]
+    mkt = [d for d in desks if d["dept_id"] == "dept_mkt"]
+    empty = [d["id"] for d in mkt if d["employee_id"] is None]
+    taken = next(d for d in mkt if d["employee_id"])
+    assert len(empty) >= 2 and all(d["floor"] == "4F" for d in mkt)
+    new = client.post("/employees", headers=ADMIN, json=[{"name": "신입", "email": "new.hire@hanbit.example", "dept_id": "dept_mkt",
+                                                         "job_title": "마케터", "slack_user_id": "U0NEWHIRE1"}]).json()["data"][0]
+    assert new["slack_user_id"] == "U0NEWHIRE1"
+    assert client.post("/employees", headers=ADMIN, json=[{"name": "중복", "email": "dup@hanbit.example", "dept_id": "dept_mkt",
+                                                          "job_title": "x", "slack_user_id": "U0NEWHIRE1"}]).status_code == 409
+    assert client.put(f"/desks/{empty[0]}", headers=ADMIN, json={"employee_id": new["id"]}).json()["data"]["employee_id"] == new["id"]
+    assert client.put(f"/desks/{taken['id']}", headers=ADMIN, json={"employee_id": new["id"]}).status_code == 409   # 남의 자리
+    client.put(f"/desks/{empty[1]}", headers=ADMIN, json={"employee_id": new["id"]})                                 # 옮기기
+    mine = [d["id"] for d in client.get("/desks", headers=ADMIN).json()["data"] if d["employee_id"] == new["id"]]
+    assert mine == [empty[1]]                                                                                         # 한 사람 한 자리
+    added = client.post("/desks", headers=ADMIN, json={"floor": "4F", "dept_id": "dept_mkt", "count": 6}).json()["data"]
+    assert [d["seq"] for d in added] == list(range(len(mkt) + 1, len(mkt) + 7))
+    assert client.put(f"/desks/{empty[1]}", headers={"Authorization": "Bearer dev.emp_mkt_01"}, json={"employee_id": None}).status_code == 403
+
+
+def test_model_release_detected_once_per_model_and_card_sent_to_all():
+    """새 모델 감지: 평소 폴링은 새것 없음, 시뮬레이션마다 승인 공급사 모델 하나씩. 승인 전 공급사(xAI)는 알리지 않는다.
+    전사 카드는 팀 주간 상한 없이 업무 시간에 발송함으로 간다."""
+    assert run("collect_release_notes", WORK_HOUR)["new_models"] == []
+    sim = lambda: client.post("/internal/jobs/collect_release_notes/run", params={"now": WORK_HOUR, "simulate": True}, headers=SYS).json()["data"]["result"]["new_models"]  # noqa: E731
+    first, second, third = sim(), sim(), sim()
+    assert [x["model_id"] for x in first + second] == ["openai:gpt-5.6", "anthropic:claude-sonnet-5-6"] and third == []
+    m = db.one("SELECT approved, tool_id FROM models WHERE id = 'openai:gpt-5.6'")
+    assert m == {"approved": False, "tool_id": "tool_chatgpt"}                     # 사내 사용 승인은 관리자가 따로
+    upd = client.get(f"/updates/{first[0]['update_id']}", headers=SYS).json()["data"]
+    assert upd["title"] == "새 모델 출시: GPT-5.6" and upd["affected_plans"] == ["ChatGPT Enterprise"]
+    sid = client.post("/suggestions", headers=SYS, json={"update_id": upd["id"], "target_type": "all", "relevance": "새 모델",
+                                                         "body": "핵심 기능\n1. a\n2. b\n3. c\n이렇게 써 보세요\n• 마케터: x"}).json()["data"]["id"]
+    sent = run("send_suggestions", WORK_HOUR)["sent"]
+    assert any(x["suggestion_id"] == sid and x["dept_id"] is None for x in sent)

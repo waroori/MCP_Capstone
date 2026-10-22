@@ -146,6 +146,18 @@ Table employees {
 }
 
 // ───────── 제품·계약·모델 ─────────
+Table desks {
+  id varchar [pk, note: '예: 4F-mkt-07']
+  floor varchar [not null, note: '층. 예: 4F']
+  dept_id varchar [not null, ref: > departments.id, note: '부서 구역']
+  seq int [not null, note: '구역 안 순서. 6개씩 한 섬']
+  employee_id varchar [unique, ref: - employees.id, note: '앉은 직원. 비면 빈 자리']
+  indexes {
+    (floor, dept_id, seq) [unique]
+  }
+  Note: '좌석 배치도의 책상. 신입 등록 때 빈 자리에 앉힌다'
+}
+
 Table tools {
   id varchar [pk, note: 'tool_chatgpt']
   kind tool_kind [not null, default: 'ai', note: 'v2: AI 외 구독 SW(Adobe 등)']

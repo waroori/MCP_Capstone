@@ -201,6 +201,7 @@ export async function getUpdates() {
     const hold = ss.find((s) => s.status === 'on_hold')
     return {
       id: u.id, product: u.vendor, date: u.published_at.slice(5, 10).replace('-', '/'), title: u.title, sourceUrl: u.url,
+      card: u.title.startsWith('새 모델 출시') ? ss.find((s) => s.target_type === 'all' && s.status !== 'on_hold')?.body : undefined,
       result: anySent ? 'sent' : 'held', note: !ss.length ? '아직 검토하지 않음' : hold && !anySent ? `전체 보류 · ${hold.hold_reason}` : undefined,
       teams: ss.filter((s) => s.status !== 'on_hold' || s.target_id).map((s) => ({
         team: s.target_id ?? '전사', result: s.status === 'sent' ? 'sent' : s.status === 'on_hold' ? 'held' : 'sent', at: s.sent_at ? dt(s.sent_at) : undefined,
@@ -209,6 +210,10 @@ export async function getUpdates() {
     }
   })
 }
+// F1 출시 시뮬레이션: Mock 공급사 목록에 새 모델 하나 공개 → 감지(새 모델 출시 업데이트) 결과
+export const simulateRelease = () => post('/internal/jobs/collect_release_notes/run?simulate=true').then((r) => r.result)
+// 발송 정책 배치. 통과한 카드는 Slack 워커가 10초 안에 DM으로 보낸다
+export const runSendSuggestions = () => post('/internal/jobs/send_suggestions/run').then((r) => r.result)
 export async function getSuggestionStats() {
   const [upd, sugg, teams] = await Promise.all([get('/updates'), get('/suggestions', { limit: 200 }), get('/adoption/teams').catch(() => [])])
   const items = sugg.items ?? sugg
@@ -267,6 +272,10 @@ export const completeSetup = () => post('/setup/complete')
 export const getDepartments = () => get('/departments')
 export const createDepartment = (name) => post('/departments', { name })
 export const createEmployees = (rows) => post('/employees', rows)
+// 책상 (좌석 배치도): 목록, 앉히기·옮기기(employeeId=null이면 비우기), 구역에 추가
+export const getDesks = () => get('/desks')
+export const putDesk = (deskId, employeeId) => put(`/desks/${encodeURIComponent(deskId)}`, { employee_id: employeeId })
+export const addDesks = (floor, deptId, count = 6) => post('/desks', { floor, dept_id: deptId, count })
 export const createContract = (body) => post('/contracts', body)
 export const getModelCatalog = () => get('/setup/model-catalog')
 export const approveModels = (ids) => put('/models/approved', { model_ids: ids })

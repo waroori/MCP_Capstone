@@ -65,6 +65,25 @@ MODELS = {m.id: m for m in [  # id = "공급사:API 모델명" = 에이전트 LL
     Model(id="openai:gpt-5.5-mini", vendor="OpenAI", name="GPT-5.5 mini (ChatGPT)", capabilities="짧은 질의·초안·분류·요약 · 빠르고 가볍다", input_usd_per_mtok=0, output_usd_per_mtok=0, allowed_data_class=DataClass.internal),
 ]}
 
+# F1 Mock 공급사 모델 목록에 차례로 나타날 '새 모델'. collect_release_notes(simulate=true)가 한 번에 하나씩 공개한다.
+# 실제 연동 때는 공급사 모델 목록 API(OpenAI GET /v1/models, Anthropic GET /v1/models)를 폴링해 DB models에 없는 것을 찾는다.
+MOCK_RELEASES = [
+    {"model": Model(id="openai:gpt-5.6", vendor="OpenAI", name="GPT-5.6", capabilities="긴 문서 추론·표 분석·이미지 이해", input_usd_per_mtok=0, output_usd_per_mtok=0,
+                    allowed_data_class=DataClass.internal),
+     "tool_id": "tool_chatgpt", "url": "https://openai.com/index/introducing-gpt-5-6/", "plans": ["ChatGPT Enterprise"],
+     "summary": "GPT-5.6 출시. (1) 한 번에 읽는 문서 길이가 2배(최대 50만 토큰)로 늘어 긴 보고서·계약서를 나누지 않고 요약·비교 "
+                "(2) 엑셀·CSV를 올리면 표를 정리하고 차트와 해석 문장을 함께 생성 (3) 스크린샷·사진 속 표와 글자를 읽어 바로 편집 가능한 표로 변환. "
+                "ChatGPT Enterprise에서 모델 선택으로 바로 사용."},
+    {"model": Model(id="anthropic:claude-sonnet-5-6", vendor="Anthropic", name="Claude Sonnet 5.6", capabilities="범용 추론·분류·요약·코드 (5.5보다 빠름)",
+                    input_usd_per_mtok=2.0, output_usd_per_mtok=10.0, allowed_data_class=DataClass.internal),
+     "tool_id": "tool_claude", "url": "https://www.anthropic.com/news/claude-sonnet-5-6", "plans": ["Claude API"],
+     "summary": "Claude Sonnet 5.6 출시. (1) 같은 가격에 응답 속도 약 1.5배 (2) 분류·추출 정확도 향상으로 대량 문의 분류에 유리 "
+                "(3) 출력 형식(JSON) 지키기가 좋아져 자동화 파이프라인 오류 감소. API 모델 이름만 바꾸면 사용."},
+    {"model": Model(id="xai:grok-5", vendor="xAI", name="Grok 5", capabilities="실시간 검색 연동", input_usd_per_mtok=3.0, output_usd_per_mtok=15.0,
+                    allowed_data_class=DataClass.public),
+     "tool_id": "tool_grok", "url": "https://x.ai/news/grok-5", "plans": [], "summary": "Grok 5 출시. 승인 전 공급사라 알리지 않는다."},
+]
+
 TASKS = {t.id: t for t in [
     RegisteredTask(id="task_hrd_survey", employee_id="emp_hrd_01", title="교육 과정별 설문 결과 비교", description="과정별 만족도 설문 파일을 비교해 공통 개선점과 과정별 차이를 정리", frequency="monthly", tools_used=["tool_chatgpt"], updated_at=NOW - timedelta(days=10)),
     RegisteredTask(id="task_mkt_copy", employee_id="emp_mkt_01", title="캠페인 카피 초안 작성", description="제품 소개 문구 3안 작성", frequency="weekly", tools_used=["tool_chatgpt"], updated_at=NOW - timedelta(days=3)),

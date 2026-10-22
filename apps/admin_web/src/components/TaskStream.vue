@@ -5,7 +5,7 @@ import { streamTask, errorLabel } from '../request.js'
 import { TOOL_LABEL } from '../labels.js'
 
 const props = defineProps({ taskId: { type: String, required: true }, after: { type: Number, default: 0 } })
-const emit = defineEmits(['done', 'approval'])
+const emit = defineEmits(['done', 'approval', 'failed'])
 const steps = ref([]), answer = ref(''), evidence = ref([]), status = ref('running'), error = ref(''), approval = ref(null)
 const ctrl = new AbortController()
 
@@ -20,9 +20,9 @@ async function run() {
       } else if (ev.type === 'TOKEN') answer.value += ev.text
       else if (ev.type === 'APPROVAL_REQUIRED') { status.value = 'waiting'; approval.value = ev.approval; emit('approval', ev) }
       else if (ev.type === 'DONE') { status.value = 'done'; answer.value = ev.result.answer; evidence.value = ev.result.evidence ?? []; emit('done', ev) }
-      else if (ev.type === 'FAILED') { status.value = 'failed'; error.value = ev.error }
+      else if (ev.type === 'FAILED') { status.value = 'failed'; error.value = ev.error; emit('failed', ev) }
     }, ctrl.signal)
-  } catch (e) { if (e.name !== 'AbortError') { status.value = 'failed'; error.value = errorLabel(e) } }
+  } catch (e) { if (e.name !== 'AbortError') { status.value = 'failed'; error.value = errorLabel(e); emit('failed', e) } }
 }
 run()
 onBeforeUnmount(() => ctrl.abort())

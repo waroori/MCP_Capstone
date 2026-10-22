@@ -53,7 +53,15 @@ class ScriptedModel(BaseChatModel):
             elif names[-1] == "get_vendor_update":
                 msg = AIMessage(content="", tool_calls=[{"name": "find_relevant_tasks", "args": {"update_id": uid}, "id": _cid()}])
             elif names[-1] == "find_relevant_tasks":
-                cands = _last_json().get("candidates") or []
+                found = _last_json()
+                cands = found.get("candidates") or []
+                upd = found.get("update") or {}
+                if upd.get("title", "").startswith("새 모델 출시"):
+                    jobs = list(dict.fromkeys(c.get("job_title") for c in cands if c.get("job_title")))[:4]
+                    body = "핵심 기능\n1. 긴 문서를 나누지 않고 요약·비교\n2. 표 정리와 차트 생성\n3. 이미지 속 표를 편집 가능한 표로\n이렇게 써 보세요\n" + "\n".join(f"• {j}: 등록 업무 자료를 한 번에 올려 정리해 보세요." for j in jobs)
+                    args = {"update_id": uid, "target_type": "all", "relevance": f"승인 공급사 새 모델 · 직무 {len(jobs)}개 활용 예", "body": body}
+                    msg = AIMessage(content="", tool_calls=[{"name": "save_suggestion", "args": args, "id": _cid()}])
+                    return ChatResult(generations=[ChatGeneration(message=msg)])
                 if cands:
                     c = cands[0]
                     args = {"update_id": uid, "target_type": "employee", "target_id": c.get("employee_id"), "task_id": c.get("task_id"),

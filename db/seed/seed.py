@@ -88,6 +88,15 @@ insert("employees", [{**e, "password_hash": None if e["id"] == "sys" else pw} fo
 humans = [e for e in list(fx.EMPLOYEES) + [g["id"] for g in gen_emps] if e != "sys"]
 emp_dept_of = {e["id"]: e["dept_id"] for e in emps}
 
+# ── 책상 ── 부서별 구역에 6개씩 섬. 사람 수 + 빈 자리 2개 이상이 되게 (신입 배치 시연)
+FLOOR_OF = {"dept_mgmt": "5F", "dept_hrd": "5F", "dept_mkt": "4F", "dept_sales": "4F", "dept_md": "4F", "dept_cs": "3F", "dept_prod": "3F"}
+desks = []
+for d, fl in FLOOR_OF.items():
+    people = sorted(e["id"] for e in emps if e["dept_id"] == d and e["id"] != "sys")
+    for k in range(-(-(len(people) + 2) // 6) * 6):
+        desks.append({"id": f"{fl}-{d.removeprefix('dept_')}-{k + 1:02d}", "floor": fl, "dept_id": d, "seq": k + 1, "employee_id": people[k] if k < len(people) else None})
+insert("desks", desks)
+
 # ── 제품·계약·모델 ──
 insert("tools", dump(fx.TOOLS.values(), kind="ai") + [
     {"id": "tool_adobe", "kind": "software", "vendor": "Adobe", "product": "Acrobat Pro", "category": "pdf_editor",

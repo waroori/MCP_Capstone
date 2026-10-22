@@ -889,6 +889,302 @@
         }
       }
     },
+    "/desks": {
+      "get": {
+        "tags": [
+          "F4"
+        ],
+        "summary": "Desks",
+        "operationId": "desks_desks_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_Desk__"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "F4"
+        ],
+        "summary": "Add Desks",
+        "description": "부서 구역 끝에 책상을 붙인다 (빈 자리가 모자랄 때).",
+        "operationId": "add_desks_desks_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeskCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_Desk__"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/desks/{desk_id}": {
+      "put": {
+        "tags": [
+          "F4"
+        ],
+        "summary": "Assign Desk",
+        "description": "직원을 앉힌다. 다른 자리에 있던 사람이면 옮긴다(예전 자리는 빈다). employee_id가 null이면 자리를 비운다.",
+        "operationId": "assign_desk_desks__desk_id__put",
+        "parameters": [
+          {
+            "name": "desk_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Desk Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeskAssign"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Desk_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
     "/contracts": {
       "post": {
         "tags": [
@@ -5253,6 +5549,18 @@
             "description": "시연·테스트용 기준 시각. 비우면 현재"
           },
           {
+            "name": "simulate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "collect_release_notes 전용: Mock 공급사 목록에 새 모델 하나를 공개 (출시 시뮬레이션)",
+              "default": false,
+              "title": "Simulate"
+            },
+            "description": "collect_release_notes 전용: Mock 공급사 목록에 새 모델 하나를 공개 (출시 시뮬레이션)"
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -6787,6 +7095,93 @@
         ],
         "title": "DepartmentCreate"
       },
+      "Desk": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "예: 4F-mkt-07"
+          },
+          "floor": {
+            "type": "string",
+            "title": "Floor",
+            "description": "층. 예: 4F"
+          },
+          "dept_id": {
+            "type": "string",
+            "title": "Dept Id",
+            "description": "이 책상이 속한 부서 구역"
+          },
+          "seq": {
+            "type": "integer",
+            "title": "Seq",
+            "description": "구역 안 순서. 6개씩 한 섬"
+          },
+          "employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "floor",
+          "dept_id",
+          "seq"
+        ],
+        "title": "Desk"
+      },
+      "DeskAssign": {
+        "properties": {
+          "employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Id",
+            "description": "앉힐 직원. 다른 자리에 있으면 옮긴다. null이면 자리를 비운다"
+          }
+        },
+        "type": "object",
+        "title": "DeskAssign"
+      },
+      "DeskCreate": {
+        "properties": {
+          "floor": {
+            "type": "string",
+            "pattern": "^[0-9]{1,2}F$",
+            "title": "Floor"
+          },
+          "dept_id": {
+            "type": "string",
+            "title": "Dept Id"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "default": 6
+          }
+        },
+        "type": "object",
+        "required": [
+          "floor",
+          "dept_id"
+        ],
+        "title": "DeskCreate"
+      },
       "DevLoginRequest": {
         "properties": {
           "employee_id": {
@@ -6936,6 +7331,19 @@
               }
             ],
             "title": "Hire Date"
+          },
+          "slack_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[UW][A-Z0-9]{8,}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slack User Id",
+            "description": "Slack 회원 ID (프로필 → ⋮ → 회원 ID 복사). 넣으면 Slack 봇이 바로 알아본다"
           }
         },
         "type": "object",
@@ -7064,6 +7472,22 @@
           "meta"
         ],
         "title": "Envelope[Department]"
+      },
+      "Envelope_Desk_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Desk"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[Desk]"
       },
       "Envelope_DevLoginResponse_": {
         "properties": {
@@ -7482,6 +7906,26 @@
           "meta"
         ],
         "title": "Envelope[list[Department]]"
+      },
+      "Envelope_list_Desk__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Desk"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[Desk]]"
       },
       "Envelope_list_Employee__": {
         "properties": {

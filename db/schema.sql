@@ -50,6 +50,16 @@ CREATE TABLE employees (
   password_hash varchar
 );
 
+-- 좌석 배치도의 책상. 직원 한 명은 한 자리만 (신입 등록 때 빈 자리에 앉힌다)
+CREATE TABLE desks (
+  id varchar PRIMARY KEY,
+  floor varchar NOT NULL,
+  dept_id varchar NOT NULL REFERENCES departments(id),
+  seq int NOT NULL,
+  employee_id varchar UNIQUE REFERENCES employees(id),
+  UNIQUE (floor, dept_id, seq)
+);
+
 -- 제품·계약·모델
 CREATE TABLE tools (
   id varchar PRIMARY KEY,
