@@ -22,7 +22,9 @@ TEMPLATES: dict[str, str] = {
         "업데이트 {update_id}를 검토하라. get_vendor_update로 내용과 대상 플랜을 확인하고, list_approved_tools로 "
         "우리 회사 플랜에 포함되는지 본다. 포함되면 find_relevant_tasks로 관련 업무 후보를 찾아 업무마다 관련성 근거를 "
         "한 줄로 쓰고 save_suggestion으로 저장한다. 플랜에 없거나 관련 업무 근거가 없으면 보내지 말고 "
-        "save_suggestion(status=on_hold, hold_reason)으로 보류 사유를 남긴다. 근거가 없는 대상에는 제안을 만들지 않는다."),
+        "save_suggestion(status=on_hold, hold_reason)으로 보류 사유를 남긴다. 근거가 없는 대상에는 제안을 만들지 않는다. "
+        "제목이 '새 모델 출시:'면 대신 카드 뉴스 한 장: save_suggestion(target_type=all)로 body에 '핵심 기능' 1~3(업데이트 요약에 있는 것만)과 "
+        "'이렇게 써 보세요' 직무(job_title)별 한 문장(등록 업무가 있는 직무 3~6개)을 쓴다."),
     "recommend_model": (
         "다음 업무에 맞는 모델을 추천하라: {task_description}. 건당 입력 길이, 필요한 정확도, 처리 시간이 빠져 있으면 먼저 묻는다. "
         "list_approved_models와 get_eval_results로 품질 기준을 통과한 후보만 고르고, estimate_task_cost로 비용을 비교한다. "

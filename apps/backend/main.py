@@ -19,6 +19,7 @@ from starlette.background import BackgroundTask
 
 from apps.backend import db
 from apps.backend.auth import APP_ENV, authenticate, current_user, get_employee, hash_password, issue_token, require
+from apps.backend.fixtures import MOCK_RELEASES
 from apps.backend.fixtures import MODELS as MODEL_CATALOG  # 공식 단가표. 시드와 같은 값을 모델 고르기 목록으로 쓴다
 from apps.backend.errors import ApiError, install_error_handlers, ok
 from schemas.common import (
@@ -1243,6 +1244,41 @@ def _job_collect_usage(now: datetime) -> dict:
     return {"records": len(rows), "seats": len(seats)}
 
 
+def _vendor_model_list(simulate: bool) -> list[dict]:
+    """Mock 공급사 모델 목록 API. 회사가 승인한 공급사만 본다. simulate면 아직 안 나온 새 모델 하나가 목록에 나타난다.
+    ponytail: Mock. 실제로는 공급사별 GET /v1/models를 부르고 응답을 MOCK_RELEASES와 같은 모양으로 바꾼다."""
+    approved = {r["vendor"] for r in db.rows("SELECT DISTINCT vendor FROM tools WHERE approval_status = 'approved'")}
+    known = {r["id"] for r in db.rows("SELECT id FROM models")}
+    listed = [{"model": m, "known": True} for m in MODEL_CATALOG.values() if m.vendor in approved]
+    nxt = next((r for r in MOCK_RELEASES if r["model"].vendor in approved and r["model"].id not in known), None)
+    return listed + ([{**nxt, "known": False}] if simulate and nxt else [])
+
+
+def _job_collect_release_notes(now: datetime, simulate: bool = False) -> dict:
+    """새 모델 감지: 공급사 모델 목록을 폴링해 DB models에 없는 모델을 찾는다 → 모델 등록(사내 승인 전) + '새 모델 출시' 업데이트.
+    카드 뉴스(핵심 기능 3개 + 직무별 활용)는 에이전트 review_update가 업데이트마다 만든다."""
+    known = {r["id"] for r in db.rows("SELECT id FROM models")}
+    found = []
+    for r in _vendor_model_list(simulate):
+        m = r["model"]
+        if m.id in known or "url" not in r:
+            continue
+        with db.tx() as c:
+            src = db.one("SELECT id FROM vendor_sources WHERE vendor = :v ORDER BY id LIMIT 1", c, v=m.vendor)
+            sid = src["id"] if src else f"src_{m.vendor.lower()}_models"
+            if not src:
+                c.execute(db.text("INSERT INTO vendor_sources (id, vendor, url, kind) VALUES (:id, :v, :u, 'docs')"), dict(id=sid, v=m.vendor, u=r["url"].rsplit("/", 2)[0]))
+            c.execute(db.text("INSERT INTO models (id, tool_id, vendor, name, capabilities, input_usd_per_mtok, output_usd_per_mtok, approved, allowed_data_class)"
+                              " VALUES (:id, :t, :v, :n, :cap, :i, :o, false, CAST(:dc AS data_class))"),
+                      dict(id=m.id, t=r["tool_id"], v=m.vendor, n=m.name, cap=m.capabilities, i=m.input_usd_per_mtok, o=m.output_usd_per_mtok, dc=m.allowed_data_class.value))
+            uid = "upd_model_" + m.id.split(":")[1].replace(".", "_").replace("-", "_")
+            c.execute(db.text("INSERT INTO vendor_updates (id, source_id, vendor, published_at, title, summary, url, affected_plans, fetched_at)"
+                              " VALUES (:id, :s, :v, :p, :t, :sm, :u, :pl, :p)"),
+                      dict(id=uid, s=sid, v=m.vendor, p=now, t=f"새 모델 출시: {m.name}", sm=r["summary"], u=r["url"], pl=r["plans"]))
+        found.append({"model_id": m.id, "update_id": uid})
+    return {"new_models": found} if found else {"new_models": [], "note": "새 모델 없음" + (" (시뮬레이션할 모델도 모두 공개됨)" if simulate else "")}
+
+
 def _in_business_hours(now: datetime) -> bool:
     k = now + KST
     return k.weekday() < 5 and 9 <= k.hour < 18
@@ -1255,9 +1291,9 @@ def _job_send_suggestions(now: datetime) -> dict:
     week_ago = now - timedelta(days=7)
     sent, held = [], []
     rs = db.rows("SELECT g.id, g.update_id, g.body, coalesce(g.target_dept_id, e.dept_id) AS dept_id, g.target_employee_id,"
-                 " d.suggestions_enabled, d.slack_channel_id, e.slack_user_id FROM suggestions g"
+                 " coalesce(d.suggestions_enabled, true) AS suggestions_enabled, d.slack_channel_id, e.slack_user_id FROM suggestions g"
                  " LEFT JOIN employees e ON e.id = g.target_employee_id"
-                 " JOIN departments d ON d.id = coalesce(g.target_dept_id, e.dept_id)"
+                 " LEFT JOIN departments d ON d.id = coalesce(g.target_dept_id, e.dept_id)"
                  " WHERE g.status IN ('draft', 'pending_approval') ORDER BY g.created_at")
     with db.tx() as c:
         for g in rs:
@@ -1270,7 +1306,7 @@ def _job_send_suggestions(now: datetime) -> dict:
                 reason = "팀 자동 발송 꺼짐"
             elif hold:
                 reason = f"관련 없음 2회 연속으로 {hold['hold_until']:%Y-%m-%d}까지 보류"
-            elif n_week >= WEEKLY_CAP:
+            elif n_week >= WEEKLY_CAP and g["dept_id"]:  # 전사 새 모델 카드는 팀 상한에 넣지 않는다
                 reason = f"팀당 주 {WEEKLY_CAP}건 상한 도달"
             if reason:
                 c.execute(db.text("UPDATE suggestions SET status = 'on_hold', hold_reason = :r WHERE id = :id"), dict(r=reason, id=g["id"]))
@@ -1286,12 +1322,14 @@ def _job_send_suggestions(now: datetime) -> dict:
             by_update.setdefault(db.one("SELECT update_id FROM suggestions WHERE id = :id", c, id=x["suggestion_id"])["update_id"], []).append(x)
         for upd, xs in by_update.items():
             c.execute(db.text("INSERT INTO review_runs (id, update_id, ran_at, sent_dept_ids, held) VALUES (:id, :u, :n, :s, CAST(:h AS jsonb))"),
-                      dict(id=_new_id("rr"), u=upd, n=now, s=sorted({x["dept_id"] for x in xs if "to" in x}), h=db.js([x for x in xs if "reason" in x])))
+                      dict(id=_new_id("rr"), u=upd, n=now, s=sorted({x["dept_id"] or "all" for x in xs if "to" in x}), h=db.js([x for x in xs if "reason" in x])))
     return {"sent": sent, "held": held}
 
 
 @app.post("/internal/jobs/{job_name}/run", response_model=Envelope[JobRunResponse], tags=["internal"])
-def run_job(job_name: str, now: datetime | None = Query(None, description="시연·테스트용 기준 시각. 비우면 현재"), user: Employee = Depends(require(Role.system, Role.admin))):
+def run_job(job_name: str, now: datetime | None = Query(None, description="시연·테스트용 기준 시각. 비우면 현재"),
+            simulate: bool = Query(False, description="collect_release_notes 전용: Mock 공급사 목록에 새 모델 하나를 공개 (출시 시뮬레이션)"),
+            user: Employee = Depends(require(Role.system, Role.admin))):
     if job_name not in JOBS:
         raise ApiError(ErrorCode.not_found, f"배치 없음. 가능: {sorted(JOBS)}")
     t, now = _now(), now or _now()
@@ -1301,8 +1339,8 @@ def run_job(job_name: str, now: datetime | None = Query(None, description="시�
         result = _job_collect_usage(now)
     elif job_name == "send_suggestions":
         result = _job_send_suggestions(now)
-    else:  # 수집 배치는 mock_vendor가 생기면 연결한다
-        result = {"stub": True, "reason": "mock_vendor 미구현. 시드 데이터로 대신함"}
+    else:
+        result = _job_collect_release_notes(now, simulate)
     with db.tx() as c:
         c.execute(db.text("INSERT INTO job_runs (id, name, queue, status, attempt, idempotency_key, payload, created_at, finished_at)"
                           " VALUES (:id, :n, 'batch', 'done', 1, :k, CAST(:p AS jsonb), :t, now())"),

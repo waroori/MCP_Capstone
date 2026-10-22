@@ -292,3 +292,12 @@ def test_seat_alert_dm_has_analyze_button():
     assert "토큰 사용량이 많은 작업 중이에요" in text and "312,000" in text and "10.4배" in text
     button = blocks[-1]["elements"][0]
     assert button["action_id"] == "seat_analyze" and button["value"] == "emp_md_01"
+
+
+def test_model_card_highlights_my_job():
+    upd = {"title": "새 모델 출시: GPT-5.6", "affected_plans": ["ChatGPT Enterprise"], "url": "https://x"}
+    body = "핵심 기능\n1. 긴 문서\n2. 표\n3. 이미지\n이렇게 써 보세요\n• 마케터: 카피 비교\n• 영업 담당: 견적 요약"
+    blocks = send.build_model_card({"id": "sug_x", "body": body}, upd, "마케터")
+    text = blocks[1]["text"]["text"]
+    assert blocks[0]["type"] == "header" and "*핵심 기능*" in text and "*• 마케터: 카피 비교*  ← 내 직무" in text and "\n• 영업 담당: 견적 요약" in text
+    assert [b["action_id"] for b in blocks[-1]["elements"]] == ["fb_useful", "fb_irrelevant", "fb_question"]

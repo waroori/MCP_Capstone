@@ -30,6 +30,27 @@ def _buttons(items: list[tuple[str, str, str, str | None]]) -> dict:
 
 
 # ---------- 1. 활용 제안 (F1) ----------
+MODEL_RELEASE = "새 모델 출시"
+
+
+def build_model_card(suggestion: dict, update: dict, job_title: str | None = None) -> list[dict]:
+    """새 모델 카드 뉴스: 제목 + 핵심 기능 3개 + 직무별 '이렇게 써 보세요'. 받는 사람의 직무 줄은 굵게."""
+    lines = []
+    for line in suggestion["body"].splitlines():
+        if line.strip() in ("핵심 기능", "이렇게 써 보세요"):
+            line = f"*{line.strip()}*"
+        elif job_title and line.lstrip("•- ").startswith(job_title + ":"):
+            line = f"*{line.strip()}*  ← 내 직무"
+        lines.append(line)
+    cond = ", ".join(update.get("affected_plans") or []) or "회사 승인 제품"
+    return [
+        {"type": "header", "text": {"type": "plain_text", "text": update["title"][:150]}},
+        _section("\n".join(lines)),
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": f"쓸 수 있는 곳: {cond} · 사내 데이터 사용은 회사 정책을 따라요 · <{update.get('url', '')}|원문 보기>"}]},
+        _buttons([("도움 됨", "fb_useful", suggestion["id"], "primary"), ("관련 없음", "fb_irrelevant", suggestion["id"], None), ("적용 방법 질문", "fb_question", suggestion["id"], None)]),
+    ]
+
+
 def build_suggestion(suggestion: dict, task_title: str | None, update: dict) -> list[dict]:
     head = f"*{task_title}* 업무에 쓸 수 있는 기능이 추가됐어요." if task_title else f"*{update.get('vendor', '')}* 에 새 기능이 추가됐어요."
     cond = ", ".join(update.get("affected_plans") or []) or "회사 플랜에서 사용 가능"
@@ -41,7 +62,10 @@ def build_suggestion(suggestion: dict, task_title: str | None, update: dict) -> 
     ]
 
 
-def send_suggestion(client, channel: str, suggestion: dict, task_title: str | None, update: dict) -> dict:
+def send_suggestion(client, channel: str, suggestion: dict, task_title: str | None, update: dict, job_title: str | None = None) -> dict:
+    if update.get("title", "").startswith(MODEL_RELEASE):
+        blocks = build_model_card(suggestion, update, job_title)
+        return client.chat_postMessage(channel=channel, text=update["title"], blocks=blocks)
     blocks = build_suggestion(suggestion, task_title, update)
     return client.chat_postMessage(channel=channel, text=suggestion["body"][:200], blocks=blocks)
 

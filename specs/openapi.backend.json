@@ -5549,6 +5549,18 @@
             "description": "시연·테스트용 기준 시각. 비우면 현재"
           },
           {
+            "name": "simulate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "collect_release_notes 전용: Mock 공급사 목록에 새 모델 하나를 공개 (출시 시뮬레이션)",
+              "default": false,
+              "title": "Simulate"
+            },
+            "description": "collect_release_notes 전용: Mock 공급사 목록에 새 모델 하나를 공개 (출시 시뮬레이션)"
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
