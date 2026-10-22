@@ -649,12 +649,11 @@ def usage(scope: UsageScope, scope_id: str, start: datetime, end: datetime, gran
 
 
 ANM_COLS = ("a.id, a.scope_type, a.scope_id, e.name AS scope_name, a.rule, a.baseline::float AS baseline, a.observed::float AS observed,"
-            " a.ratio::float AS ratio, a.projected_monthly_krw, a.projected_monthly_usd::float AS projected_monthly_usd, a.status, a.created_at")
+            " a.ratio::float AS ratio, a.status, a.created_at")
 
 
 def _anomaly(r: dict) -> Anomaly:
-    krw, usd = r.pop("projected_monthly_krw"), r.pop("projected_monthly_usd")
-    return Anomaly(**r, projected_monthly_cost=Money(krw=krw, usd=usd) if krw is not None else None)
+    return Anomaly(**r)
 
 
 @app.get("/projects", response_model=Envelope[list[Project]], tags=["F3"])

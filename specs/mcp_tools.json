@@ -1768,7 +1768,6 @@
             "AnomalyStatus": {
               "enum": [
                 "open",
-                "investigating",
                 "resolved"
               ],
               "title": "AnomalyStatus",
@@ -1836,17 +1835,6 @@
                   "title": "Ratio",
                   "type": "number"
                 },
-                "projected_monthly_cost": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/Money"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null
-                },
                 "status": {
                   "$ref": "#/$defs/AnomalyStatus"
                 },
@@ -1873,31 +1861,10 @@
             "AnomalyStatus": {
               "enum": [
                 "open",
-                "investigating",
                 "resolved"
               ],
               "title": "AnomalyStatus",
               "type": "string"
-            },
-            "Money": {
-              "properties": {
-                "krw": {
-                  "description": "원화 정수",
-                  "title": "Krw",
-                  "type": "integer"
-                },
-                "usd": {
-                  "description": "달러 소수",
-                  "title": "Usd",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "krw",
-                "usd"
-              ],
-              "title": "Money",
-              "type": "object"
             }
           },
           "properties": {

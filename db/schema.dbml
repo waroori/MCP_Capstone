@@ -80,7 +80,6 @@ Enum license_flag {
 }
 Enum anomaly_status {
   open
-  investigating
   resolved
 }
 Enum plan_type {
@@ -243,7 +242,6 @@ Table vendor_sources {
   vendor varchar [not null]
   url varchar [not null, unique]
   kind source_kind [not null]
-  is_candidate boolean [not null, default: false]
 }
 
 Table vendor_updates {
@@ -365,8 +363,6 @@ Table anomalies {
   baseline numeric(14,2) [not null]
   observed numeric(14,2) [not null]
   ratio numeric(8,2) [not null]
-  projected_monthly_krw int
-  projected_monthly_usd numeric(12,4)
   status anomaly_status [not null, default: 'open']
   created_at timestamptz [not null]
   indexes { (scope_type, scope_id, rule, created_at) }

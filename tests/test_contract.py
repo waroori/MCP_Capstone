@@ -196,7 +196,7 @@ def test_plan_items_validated_per_type():
 
 def test_confirmation_create_and_answer():
     # cfm_001(emp_sales_02)은 이미 반납 응답이 있으므로 아직 묻지 않은 휴직자로 새 요청을 만든다
-    r = client.post("/confirmations", json={"employee_id": "emp_gen_007", "plan_id": "plan_002", "question": "계속 쓰시나요?"}, headers=ASSET)
+    r = client.post("/confirmations", json={"employee_id": "emp_mgmt_02", "plan_id": "plan_002", "question": "계속 쓰시나요?"}, headers=ASSET)
     assert r.status_code == 201, r.text
     c = r.json()["data"]
     assert c["id"].startswith("cfm_") and c["due_at"] and c["answer"] is None and c["answered_at"] is None
@@ -236,7 +236,7 @@ def test_employee_profile_and_plan_opinion():
 
 def test_confirmations_list_and_outbox_delivered_mark():
     """Slack 봇 워커가 쓰는 두 경로: 미응답 확인 요청 목록, 발송함 전달 표시(멱등)."""
-    c = client.post("/confirmations", json={"employee_id": "emp_gen_015", "plan_id": "plan_002", "question": "계속 쓰시나요?"}, headers=ASSET).json()["data"]
+    c = client.post("/confirmations", json={"employee_id": "emp_hrd_04", "plan_id": "plan_002", "question": "계속 쓰시나요?"}, headers=ASSET).json()["data"]
     pending = client.get("/confirmations", params={"answered": "false"}, headers=SYS).json()["data"]
     assert c["id"] in {x["id"] for x in pending} and all(x["answer"] is None for x in pending)
     assert client.get("/confirmations", headers=EMP).status_code == 403

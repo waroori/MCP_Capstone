@@ -146,22 +146,22 @@ def test_create_app_registers_listeners_without_network():
 
 # ---------- 발신 워커 (확인 요청 DM · 발송함 · F1 체인) ----------
 def _fake_backend(calls, outbox_delivered):
-    emp = {"id": "emp_gen_052", "name": "이새봄", "dept_id": "dept_mkt", "slack_user_id": "U_FAKE"}
+    emp = {"id": "emp_sales_09", "name": "이새봄", "dept_id": "dept_mkt", "slack_user_id": "U_FAKE"}
     def backend(method, path, token, **kw):
         calls.append((method, path))
         if path == "/confirmations":
-            return [{"id": "cfm_9", "plan_id": "plan_9", "employee_id": "emp_gen_052", "question": "계속 쓰시나요?", "answer": None, "due_at": "2026-10-28T00:00:00Z", "answered_at": None}]
+            return [{"id": "cfm_9", "plan_id": "plan_9", "employee_id": "emp_sales_09", "question": "계속 쓰시나요?", "answer": None, "due_at": "2026-10-28T00:00:00Z", "answered_at": None}]
         if path == "/inventory":
-            return [{"contract": {"id": "ctr_chatgpt_2026"}, "tool_name": "ChatGPT Enterprise", "low_usage_candidates": [{"employee_id": "emp_gen_052", "last_activity_at": None}]}]
+            return [{"contract": {"id": "ctr_chatgpt_2026"}, "tool_name": "ChatGPT Enterprise", "low_usage_candidates": [{"employee_id": "emp_sales_09", "last_activity_at": None}]}]
         if path == "/plans/plan_9":
-            return {"id": "plan_9", "type": "seat_reclaim", "items": [{"employee_id": "emp_gen_052", "contract_id": "ctr_chatgpt_2026"}]}
+            return {"id": "plan_9", "type": "seat_reclaim", "items": [{"employee_id": "emp_sales_09", "contract_id": "ctr_chatgpt_2026"}]}
         if path.startswith("/employees/"):
             return {"employee": emp, "tasks": [{"id": "task_1", "title": "캠페인 카피 초안"}], "products": []}
         if path == "/notify-outbox":
             return [{"id": "out_1", "suggestion_id": "sug_1", "channel": "slack", "target": "U_FAKE", "text": "새 기능을 카피 작성에 쓸 수 있어요", "delivered_at": None},
                     {"id": "out_0", "suggestion_id": "sug_0", "channel": "slack", "target": "C_X", "text": "이미 보냄", "delivered_at": "2026-10-20T00:00:00Z"}]
         if path == "/suggestions":
-            return {"items": [{"id": "sug_1", "update_id": "upd_1", "target_type": "employee", "target_id": "emp_gen_052", "task_id": "task_1", "body": "b", "status": "sent"}]}
+            return {"items": [{"id": "sug_1", "update_id": "upd_1", "target_type": "employee", "target_id": "emp_sales_09", "task_id": "task_1", "body": "b", "status": "sent"}]}
         if path == "/updates/upd_1":
             return {"id": "upd_1", "vendor": "OpenAI", "url": "https://v.example/rn", "affected_plans": ["Enterprise"], "title": "t", "summary": "s"}
         if path == "/notify-outbox/out_1/delivered":
@@ -179,7 +179,7 @@ def test_worker_sends_confirmation_dm_once_and_delivers_outbox(monkeypatch, tmp_
     from apps.slack_bot import worker
     calls, delivered = [], []
     monkeypatch.setattr(api, "backend", _fake_backend(calls, delivered))
-    monkeypatch.setattr(identity, "_user_map", lambda: {"U0REAL0001": "emp_gen_052"})  # 시드의 U_FAKE 대신 매핑표로 찾는다
+    monkeypatch.setattr(identity, "_user_map", lambda: {"U0REAL0001": "emp_sales_09"})  # 시드의 U_FAKE 대신 매핑표로 찾는다
     monkeypatch.setattr(worker, "STATE_PATH", tmp_path / "state.json")
     worker._emp_cache.clear()
     slack = FakeSlack()
@@ -210,7 +210,7 @@ def test_run_f1_reviews_only_unreviewed_updates_then_sends(monkeypatch, tmp_path
     from apps.slack_bot import worker
     calls, delivered = [], []
     monkeypatch.setattr(api, "backend", _fake_backend(calls, delivered))
-    monkeypatch.setattr(identity, "_user_map", lambda: {"U0REAL0001": "emp_gen_052"})
+    monkeypatch.setattr(identity, "_user_map", lambda: {"U0REAL0001": "emp_sales_09"})
     created = []
     def agent(method, path, token, **kw):
         if method == "POST":
@@ -269,8 +269,8 @@ def test_outcome_messages_cover_reclaim_holder_and_requester():
     m = worker.outcome_messages({"type": "api_access", "status": "executed", "requested_by": "emp_md_01", "items": [{"tool_id": "tool_claude", "purpose": "x"}],
                                  "result": {"handoffs": [{"handoff_id": "kh_abc", "key_prefix": "sk-mock-AbCd"}]}}, names)
     assert "sk-mock-AbCd" in m["emp_md_01"] and "/key/kh_abc" in m["emp_md_01"] and "한 번" in m["emp_md_01"]  # 키 전체는 Slack에 없음
-    m = worker.outcome_messages({"type": "seat_reclaim", "status": "executed", "requested_by": "emp_asset_01", "items": [{"employee_id": "emp_gen_052", "contract_id": "ctr_chatgpt_2026"}]}, names)
-    assert "반납 처리됐어요" in m["emp_gen_052"] and "반납 처리가 끝났어요" in m["emp_asset_01"]
+    m = worker.outcome_messages({"type": "seat_reclaim", "status": "executed", "requested_by": "emp_asset_01", "items": [{"employee_id": "emp_sales_09", "contract_id": "ctr_chatgpt_2026"}]}, names)
+    assert "반납 처리됐어요" in m["emp_sales_09"] and "반납 처리가 끝났어요" in m["emp_asset_01"]
     m = worker.outcome_messages({"type": "seat_assign", "status": "failed", "requested_by": "emp_md_01", "items": [{"employee_id": "emp_md_01", "contract_id": "ctr_chatgpt_2026"}]}, names)
     assert "관리자가 다시 확인" in m["emp_md_01"]
 

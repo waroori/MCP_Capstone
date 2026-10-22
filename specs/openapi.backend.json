@@ -6524,16 +6524,6 @@
             "type": "number",
             "title": "Ratio"
           },
-          "projected_monthly_cost": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "status": {
             "$ref": "#/components/schemas/AnomalyStatus"
           },
@@ -6561,7 +6551,6 @@
         "type": "string",
         "enum": [
           "open",
-          "investigating",
           "resolved"
         ],
         "title": "AnomalyStatus"

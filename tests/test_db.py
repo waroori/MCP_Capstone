@@ -109,7 +109,7 @@ def test_assign_revalidates_before_execute():
     """중복 배정·휴직자는 승인 대기에 들어가기 전에 막고(409) 조치안을 failed로 남긴다.
     좌석이 없으면 승인 대기 → 관리자 승인 = 1석 추가 구매(Mock) 후 배정. 좌석 수를 넘지 않고, 구매했으니 절감 기록도 없다."""
     savings = db.one("SELECT count(*) AS n FROM savings_ledger")["n"]
-    for emp, why in [("emp_gen_002", "이미"), ("emp_gen_007", "on_leave")]:
+    for emp, why in [("emp_mkt_02", "이미"), ("emp_mgmt_02", "on_leave")]:
         r = assign(emp)
         assert r.status_code == 409 and why in r.json()["error"]["message"]
         assert db.one("SELECT status FROM action_plans WHERE id = :id", id=r.json()["error"]["details"]["plan_id"])["status"] == "failed"

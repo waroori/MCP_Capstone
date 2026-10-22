@@ -73,11 +73,26 @@ insert("company", [{"name": "한빛제조", "setup_completed_at": DAY0, "created
 SURNAMES = "김이박최정강조윤장임한오서신권황안송류홍"
 GIVEN = ["민서", "지호", "나연", "도현", "하은", "준우", "예린", "시우", "수아", "건우", "지안", "유준", "다은", "현우", "채원", "승민"]
 TITLES = {"dept_mgmt": "경영지원", "dept_hrd": "교육 운영", "dept_mkt": "마케터", "dept_sales": "영업 담당", "dept_cs": "CS 상담", "dept_prod": "생산 계획", "dept_md": "상품기획"}
-gen_emps = []
+# 이름 로마자 (회사 이메일 = 좌석 제품 SSO 아이디. 페르소나와 같은 '이름.성@' 규칙)
+ROMAN_SUR = dict(zip(SURNAMES, "kim lee park choi jung kang cho yoon jang lim han oh seo shin kwon hwang ahn song ryu hong".split()))
+ROMAN_GIVEN = dict(zip(GIVEN, "minseo jiho nayeon dohyun haeun junwoo yerin siwoo sua gunwoo jian yujun daeun hyunwoo chaewon seungmin".split()))
+gen_emps, used_names = [], {e.name for e in fx.EMPLOYEES.values()}
+used_ids, seq = set(fx.EMPLOYEES), {}
+GEN = {}  # 생성 순번 → 직원 id (시나리오에 쓰는 특정 직원을 가리킬 때)
 for i in range(1, 53):  # 페르소나 포함 사람 59명 → ChatGPT Enterprise 60석 중 58석 배정 (fixtures와 같은 수치)
     dept = list(TITLES)[i % len(TITLES)]
-    gen_emps.append({"id": f"emp_gen_{i:03d}", "name": random.choice(SURNAMES) + random.choice(GIVEN),
-                     "email": f"user{i:03d}@hanbit.example", "dept_id": dept, "role": "employee",
+    sur, giv = random.choice(SURNAMES), random.choice(GIVEN)
+    while sur + giv in used_names:  # 동명이인 없이: 이름을 차례로 바꿔 본다 (난수를 더 쓰지 않아 다른 더미 값은 그대로)
+        giv = GIVEN[(GIVEN.index(giv) + 1) % len(GIVEN)]
+    used_names.add(sur + giv)
+    short = dept.removeprefix("dept_")  # id = 부서 + 번호 (페르소나 emp_mkt_01 과 같은 규칙, 겹치면 다음 번호)
+    while f"emp_{short}_{seq.setdefault(short, 1):02d}" in used_ids:
+        seq[short] += 1
+    eid = f"emp_{short}_{seq[short]:02d}"
+    used_ids.add(eid)
+    GEN[i] = eid
+    gen_emps.append({"id": eid, "name": sur + giv,
+                     "email": f"{ROMAN_GIVEN[giv]}.{ROMAN_SUR[sur]}@hanbit.example", "dept_id": dept, "role": "employee",
                      "job_title": TITLES[dept], "status": "on_leave" if i in (7, 23) else "active",
                      "hire_date": (NOW - timedelta(days=20 if i in (52, 53, 54) else 400 + i * 9)).date()})
 # 시연용 로그인 비밀번호. 모든 사람 계정 공통(시스템 계정 sys는 비밀번호 없음 = 로그인 불가)
@@ -144,7 +159,7 @@ insert("registered_tasks", dump(fx.TASKS.values()) + gen_tasks)
 insert("vendor_sources", [
     {"id": "src_chatgpt_rn", "vendor": "OpenAI", "url": "https://openai.com/business/chatgpt-pricing/", "kind": "release_notes"},
     {"id": "src_claude_rn", "vendor": "Anthropic", "url": "https://platform.claude.com/docs/en/about-claude/pricing", "kind": "pricing"},
-    {"id": "src_x_docs", "vendor": "xAI", "url": "https://docs.x.ai/developers/models", "kind": "docs", "is_candidate": True}])
+    {"id": "src_x_docs", "vendor": "xAI", "url": "https://docs.x.ai/developers/models", "kind": "docs"}])
 insert("vendor_updates", dump(fx.UPDATES.values()))
 sugs = []
 for s in dump(fx.SUGGESTIONS.values()):
@@ -177,7 +192,7 @@ PROJECTS = {p.id: p for p in fx.PROJECTS.values()}
 PROJECTS.update({p.id: p for p in [
     fx.PROJECTS["prj_faq"].model_copy(update=dict(id="prj_mkt_copy", name="캠페인 카피 초안", dept_id="dept_mkt", owner_id="emp_mkt_01",
                                                   purpose="제품 소개 문구 여러 안 생성", model_id="anthropic:claude-sonnet-5-5", environment=fx.Environment.prod, monthly_budget_krw=80000)),
-    fx.PROJECTS["prj_faq"].model_copy(update=dict(id="prj_prod_report", name="생산 일보 요약", dept_id="dept_prod", owner_id="emp_gen_005",
+    fx.PROJECTS["prj_faq"].model_copy(update=dict(id="prj_prod_report", name="생산 일보 요약", dept_id="dept_prod", owner_id=GEN[5],
                                                   purpose="라인별 생산 일보를 요약해 일정 변경 공지 초안 작성", model_id="anthropic:claude-haiku-5-5", environment=fx.Environment.prod, monthly_budget_krw=15000)),
 ]})
 insert("projects", dump(PROJECTS.values()))
@@ -211,9 +226,9 @@ insert("usage_records", usage)
 seats = []
 for i, e in enumerate(x for x in humans if x != "emp_mkt_01"):
     flag, last, since = None, NOW - timedelta(days=random.randint(0, 6)), DAY0
-    if e in ("emp_gen_052", "emp_gen_053", "emp_gen_054"):  # 입사일(20일 전)에 배정 = plan_000 등
+    if e in (GEN[52],):  # 입사일(20일 전)에 배정 = plan_000 등
         flag, since = "recent_hire", NOW - timedelta(days=20)
-    elif e in ("emp_sales_02", "emp_gen_007", "emp_gen_023"):
+    elif e in ("emp_sales_02", GEN[7], GEN[23]):
         flag, last = "on_leave", NOW - timedelta(days=50)
     elif i % 9 == 0:
         flag, last = "unused", NOW - timedelta(days=45)
@@ -256,7 +271,7 @@ insert("usage_records", chat_usage)
 # ── 처리 요청 · 절감 · 감사 ──
 # plan_000: 지난달 신규 입사자 좌석 배정(실행 완료). 절감 기록 sav_001은 실행된 조치안에만 붙는다
 plans = [{"id": "plan_000", "type": "seat_assign", "risk_level": "low", "status": "executed",
-          "items": [{"employee_id": "emp_gen_052", "contract_id": "ctr_chatgpt_2026"}], "rationale": "신규 입사자 배정 (미배정 좌석 사용)",
+          "items": [{"employee_id": GEN[52], "contract_id": "ctr_chatgpt_2026"}], "rationale": "신규 입사자 배정 (미배정 좌석 사용)",
           "evidence": [{"source": "inventory", "ref": "ctr_chatgpt_2026", "value": {"unassigned": 3}}], "requested_by": "emp_asset_01",
           "approver_id": None, "execution_key": "auto_plan_000", "executed_at": NOW - timedelta(days=20),
           "result": {"vendor": "mock", "ok": True}, "created_at": NOW - timedelta(days=20)}] + dump(fx.PLANS.values())

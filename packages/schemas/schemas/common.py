@@ -168,7 +168,6 @@ class PaceLevel(StrEnum):
 
 class AnomalyStatus(StrEnum):
     open = "open"
-    investigating = "investigating"
     resolved = "resolved"
 
 

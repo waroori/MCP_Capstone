@@ -20,7 +20,7 @@ CREATE TYPE reaction AS ENUM ('useful', 'irrelevant', 'question');
 CREATE TYPE environment AS ENUM ('test', 'prod');
 CREATE TYPE seat_status AS ENUM ('assigned', 'unassigned');
 CREATE TYPE license_flag AS ENUM ('unused', 'on_leave', 'no_record', 'recent_hire');
-CREATE TYPE anomaly_status AS ENUM ('open', 'investigating', 'resolved');
+CREATE TYPE anomaly_status AS ENUM ('open', 'resolved');
 CREATE TYPE plan_type AS ENUM ('seat_assign', 'seat_reclaim', 'api_access', 'model_change', 'budget_review', 'purchase_review');
 CREATE TYPE plan_status AS ENUM ('draft', 'pending_approval', 'approved', 'executed', 'failed', 'rejected');
 CREATE TYPE risk_level AS ENUM ('low', 'medium', 'high');
@@ -145,8 +145,7 @@ CREATE TABLE vendor_sources (
   id varchar PRIMARY KEY,
   vendor varchar NOT NULL,
   url varchar NOT NULL UNIQUE,
-  kind source_kind NOT NULL,
-  is_candidate boolean NOT NULL DEFAULT false
+  kind source_kind NOT NULL
 );
 
 CREATE TABLE vendor_updates (
@@ -275,8 +274,6 @@ CREATE TABLE anomalies (
   baseline numeric(14,2) NOT NULL,
   observed numeric(14,2) NOT NULL,
   ratio numeric(8,2) NOT NULL,
-  projected_monthly_krw int,
-  projected_monthly_usd numeric(12,4),
   status anomaly_status NOT NULL DEFAULT 'open',
   created_at timestamptz NOT NULL
 );
@@ -376,3 +373,26 @@ CREATE TABLE job_runs (
   finished_at timestamptz
 );
 CREATE INDEX ON job_runs (status, created_at);
+
+-- DBeaver 조회용: ID 대신 이름으로 본다 (코드에서는 쓰지 않는다)
+CREATE VIEW seat_assignments_named AS
+SELECT s.id, t.product, e.name AS employee_name, d.name AS dept_name, e.job_title, e.status AS employee_status, s.status, s.flag,
+       s.assigned_at, s.unassigned_at, s.last_activity_at
+FROM seat_assignments s
+JOIN contracts c ON c.id = s.contract_id
+JOIN tools t ON t.id = c.tool_id
+JOIN employees e ON e.id = s.employee_id
+JOIN departments d ON d.id = e.dept_id;
+
+CREATE VIEW desks_named AS
+SELECT k.id, k.floor, d.name AS zone, k.seq, e.name AS employee_name, ed.name AS employee_dept, e.job_title
+FROM desks k
+JOIN departments d ON d.id = k.dept_id
+LEFT JOIN employees e ON e.id = k.employee_id
+LEFT JOIN departments ed ON ed.id = e.dept_id;
+
+CREATE VIEW anomalies_named AS
+SELECT a.id, a.rule, e.name AS employee_name, d.name AS dept_name, a.baseline, a.observed, a.ratio, a.status, a.created_at
+FROM anomalies a
+LEFT JOIN employees e ON a.scope_type = 'employee' AND e.id = a.scope_id
+LEFT JOIN departments d ON d.id = e.dept_id;

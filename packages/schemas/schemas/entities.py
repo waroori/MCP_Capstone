@@ -108,7 +108,6 @@ class VendorSource(Base):
     vendor: str
     url: str
     kind: SourceKind
-    is_candidate: bool = False
 
 
 class VendorUpdate(Base):
@@ -217,7 +216,6 @@ class Anomaly(Base):
     baseline: float
     observed: float
     ratio: float
-    projected_monthly_cost: Money | None = None
     status: AnomalyStatus
     created_at: datetime
 
