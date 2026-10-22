@@ -31,9 +31,9 @@ MAX_FAILS, LOCK_SECONDS = 5, 300
 _fails: dict[str, tuple[int, float]] = {}
 
 
-def issue_token(employee: Employee) -> str:
+def issue_token(employee: Employee, ttl: timedelta = TOKEN_TTL) -> str:
     now = datetime.now(UTC)
-    claims = {"sub": employee.id, "role": employee.role.value, "iat": now, "exp": now + TOKEN_TTL}
+    claims = {"sub": employee.id, "role": employee.role.value, "iat": now, "exp": now + ttl}
     return jwt.encode(claims, JWT_SECRET, algorithm="HS256")
 
 
@@ -98,3 +98,9 @@ def require(*roles: Role):
         return user
 
     return dep
+
+
+if __name__ == "__main__":
+    # SYSTEM_TOKEN 발급: uv run python -m apps.backend.auth  → 출력을 .env의 SYSTEM_TOKEN= 에 넣는다 (JWT_SECRET이 같아야 한다)
+    # ponytail: 1년짜리 토큰이다. 유출되면 JWT_SECRET을 바꿔 모든 토큰을 무효로 하고 다시 발급한다
+    print(issue_token(get_employee("sys"), timedelta(days=365)))

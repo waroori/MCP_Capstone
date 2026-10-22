@@ -168,6 +168,106 @@
         }
       }
     },
+    "/auth/slack-exchange": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Slack Exchange",
+        "description": "Slack 봇(시스템 토큰)이 Slack 사용자 대신 직원 토큰을 받는다. APP_ENV=prod에서도 열려 있다(dev-login 대신).",
+        "operationId": "slack_exchange_auth_slack_exchange_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackExchangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_DevLoginResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
     "/setup/status": {
       "get": {
         "tags": [
@@ -8852,6 +8952,11 @@
             },
             "type": "object",
             "title": "Steps"
+          },
+          "dev_login": {
+            "type": "boolean",
+            "title": "Dev Login",
+            "default": false
           }
         },
         "type": "object",
@@ -8913,6 +9018,30 @@
           "password"
         ],
         "title": "SignupRequest"
+      },
+      "SlackExchangeRequest": {
+        "properties": {
+          "slack_user_id": {
+            "type": "string",
+            "title": "Slack User Id"
+          },
+          "employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slack_user_id"
+        ],
+        "title": "SlackExchangeRequest"
       },
       "Suggestion": {
         "properties": {

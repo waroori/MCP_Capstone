@@ -16,10 +16,10 @@ const bad = ref({ id: false, pw: false }) // 오류 문구를 어느 입력칸�
 const caps = ref(false)
 const idEl = ref(null)
 const pwEl = ref(null)
-const isDev = import.meta.env.DEV
+const isDev = ref(false) // 개발 화면(npm run dev)이고 서버가 dev-login을 열어 둘 때(APP_ENV≠prod)만 시연 계정 버튼을 보인다
 // 아직 가입한 회사가 없으면 '회사 등록' 안내를 띄운다
 const noCompany = ref(false)
-setupStatus().then((s) => (noCompany.value = !s.company_name)).catch(() => {})
+setupStatus().then((s) => { noCompany.value = !s.company_name; isDev.value = import.meta.env.DEV && s.dev_login }).catch(() => {})
 // 개발 서버에서만 보이는 시연 계정 (db/seed/seed.py)
 // 페르소나 4명 (docs User Persona)
 const DEMO = [

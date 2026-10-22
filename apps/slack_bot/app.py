@@ -20,7 +20,6 @@ import os
 import threading
 import time
 
-from dotenv import load_dotenv
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -28,7 +27,6 @@ from apps.slack_bot import client as api
 from apps.slack_bot import identity, worker
 from apps.slack_bot.send import build_answer, build_approval_request
 
-load_dotenv()
 log = logging.getLogger("slack_bot")
 WEB_URL = os.getenv("WEB_URL", "http://localhost:5173")
 FRIENDLY = {"unauthorized": "누구인지 확인하지 못했어요. 관리자에게 Slack 연결을 요청해 주세요.", "forbidden": "이 요청은 권한이 없어 처리할 수 없어요.", "not_found": "찾을 수 없는 항목이에요.",

@@ -8,14 +8,14 @@
 | `worker.py` | 발신 스레드(10초 주기): 미응답 사용 의사 확인 요청 → 직원 DM(버튼), 발송함(notify_outbox) → 직원·부서원 DM(제안+반응 버튼), 웹에서 승인·실행/반려/실패로 끝난 처리 요청 → 요청자(와 좌석 당사자) DM. 결과 알림은 봇이 뜬 뒤 바뀐 건만(과거 건 재알림 없음). F1 한 바퀴(`--run-f1`): 수집 배치 → 검토 안 된 업데이트마다 에이전트 `review_update` → 발송 정책 배치 → Slack 전송 |
 | `send.py` | 메시지 형식 5종(제안·확인 요청·승인 요청·알림·답변)의 Block Kit 빌더와 발송 함수 |
 | `client.py` | 백엔드·에이전트 HTTP, SSE 소비 |
-| `identity.py` | Slack 사용자 → 직원 토큰. 백엔드 `POST /auth/slack-exchange`가 생기면 그걸 쓰고, 그 전엔 `SLACK_USER_MAP` + dev-login |
+| `identity.py` | Slack 사용자 → 직원 토큰. 백엔드 `POST /auth/slack-exchange`(시스템 토큰)로 받는다. `SLACK_USER_MAP`의 직원 id를 같이 넘긴다 |
 
 ## 준비
 `.env`
 ```
 SLACK_BOT_TOKEN=xoxb-...
 SLACK_APP_TOKEN=xapp-...
-SLACK_USER_MAP={"U0XXXX":"emp_mkt_01","U0YYYY":"emp_asset_01"}   # Slack 사용자 id → 직원 id (JWT 전환 전 임시)
+SLACK_USER_MAP={"U0XXXX":"emp_mkt_01","U0YYYY":"emp_asset_01"}   # Slack 사용자 id → 직원 id (시드의 slack_user_id는 가짜라 이 매핑이 우선)
 SLACK_ADMIN_USER_IDS=U0YYYY                                        # 처리 확인 DM을 받을 관리자
 ```
 Slack 앱 설정: Socket Mode, Bot scopes(chat:write, im:history, im:read, im:write, app_mentions:read, channels:read, channels:join, channels:history, users:read), Events(message.im, app_mention, message.channels), Interactivity On, App Home의 Messages Tab On.

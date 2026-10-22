@@ -76,6 +76,7 @@ from schemas.rest import (
     ConfirmationCreate,
     ContractInventory,
     DevLoginRequest,
+    SlackExchangeRequest,
     DevLoginResponse,
     LoginRequest,
     FeedbackCreate,
@@ -135,6 +136,18 @@ def dev_login(body: DevLoginRequest):
     return ok(DevLoginResponse(access_token=issue_token(emp), employee=emp))
 
 
+@app.post("/auth/slack-exchange", response_model=Envelope[DevLoginResponse], tags=["auth"])
+def slack_exchange(body: SlackExchangeRequest, user: Employee = Depends(require(Role.system))):
+    """Slack 봇(시스템 토큰)이 Slack 사용자 대신 직원 토큰을 받는다. APP_ENV=prod에서도 열려 있다(dev-login 대신)."""
+    r = None if body.employee_id else db.one("SELECT id FROM employees WHERE slack_user_id = :s", s=body.slack_user_id)
+    emp = get_employee(body.employee_id or (r and r["id"]) or "")
+    if not emp:
+        raise ApiError(ErrorCode.not_found, f"Slack 사용자 {body.slack_user_id} 에 연결된 직원이 없습니다. SLACK_USER_MAP을 확인하세요.")
+    if emp.status == "resigned":
+        raise ApiError(ErrorCode.forbidden, "퇴사 처리된 계정입니다")
+    return ok(DevLoginResponse(access_token=issue_token(emp), employee=emp))
+
+
 # ---------- 초기 설정 (회원가입 → 마법사) ----------
 # 회사는 한 곳(company 테이블 한 행). 설정 변경은 처리 요청 없이 관리자가 바로 하고 모두 audit_log에 남긴다.
 EMP_COLS = "e.id, e.name, e.email, e.dept_id, d.name AS dept_name, e.role, e.job_title, e.status, e.hire_date, e.slack_user_id"
@@ -150,7 +163,7 @@ def _setup_status() -> SetupStatus:
                " (SELECT count(*) FROM contracts) AS contracts, (SELECT count(*) FROM models WHERE approved) AS models,"
                " (SELECT count(*) FROM projects) AS projects, (SELECT count(*) FROM budgets WHERE fiscal_year = :y) AS budgets,"
                " (SELECT count(*) FROM employees WHERE role = 'admin' AND password_hash IS NOT NULL) AS admins", y=_this_year())
-    return SetupStatus(company_name=c and c["name"], has_admin=n.pop("admins") > 0, setup_completed=bool(c and c["setup_completed_at"]), steps=n)
+    return SetupStatus(company_name=c and c["name"], has_admin=n.pop("admins") > 0, setup_completed=bool(c and c["setup_completed_at"]), steps=n, dev_login=APP_ENV != "prod")
 
 
 @app.get("/setup/status", response_model=Envelope[SetupStatus], tags=["setup"])

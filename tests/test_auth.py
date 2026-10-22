@@ -48,3 +48,29 @@ def test_expired_and_forged_tokens_rejected():
     r1 = client.get("/me", headers={"Authorization": f"Bearer {expired}"})
     r2 = client.get("/me", headers={"Authorization": f"Bearer {forged}"})
     assert r1.status_code == r2.status_code == 401 and "만료" in r1.json()["error"]["message"]
+
+
+def test_prod_blocks_dev_paths_but_slack_exchange_works(monkeypatch):
+    """APP_ENV=prod: dev 토큰·dev-login은 막히고, Slack 봇은 시스템 JWT로 slack-exchange를 써서 직원 토큰을 받는다."""
+    from apps.backend import main
+    monkeypatch.setattr(auth, "APP_ENV", "prod")
+    monkeypatch.setattr(main, "APP_ENV", "prod")
+    assert client.get("/me", headers={"Authorization": "Bearer dev.emp_asset_01"}).status_code == 401
+    assert client.post("/auth/dev-login", json={"employee_id": "emp_asset_01"}).status_code == 404
+
+    sys_jwt = {"Authorization": f"Bearer {auth.issue_token(auth.get_employee('sys'), timedelta(days=365))}"}
+    r = client.post("/auth/slack-exchange", json={"slack_user_id": "U_REAL", "employee_id": "emp_mkt_01"}, headers=sys_jwt)
+    assert r.status_code == 200 and r.json()["data"]["employee"]["id"] == "emp_mkt_01"
+    emp_jwt = {"Authorization": f"Bearer {r.json()['data']['access_token']}"}
+    assert client.get("/me", headers=emp_jwt).json()["data"]["employee"]["id"] == "emp_mkt_01"
+    by_slack = client.post("/auth/slack-exchange", json={"slack_user_id": "U_MKT01"}, headers=sys_jwt).json()["data"]["employee"]["id"]
+    assert by_slack == "emp_mkt_01"  # 매핑이 없으면 직원의 slack_user_id로 찾는다
+    assert client.post("/auth/slack-exchange", json={"slack_user_id": "U_NONE"}, headers=sys_jwt).status_code == 404
+    assert client.post("/auth/slack-exchange", json={"slack_user_id": "U_MKT01"}, headers=emp_jwt).status_code == 403  # 시스템 계정만
+
+
+def test_setup_status_tells_ui_whether_dev_login_is_open(monkeypatch):
+    from apps.backend import main
+    assert client.get("/setup/status").json()["data"]["dev_login"] is True
+    monkeypatch.setattr(main, "APP_ENV", "prod")
+    assert client.get("/setup/status").json()["data"]["dev_login"] is False

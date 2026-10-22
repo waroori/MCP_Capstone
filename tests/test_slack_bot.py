@@ -116,13 +116,22 @@ def test_feedback_button_calls_backend(monkeypatch):
     assert calls == {"sid": "sug_1", "reaction": "irrelevant"} and "관련 없음" in slack.ephemeral[-1]["text"]
 
 
-def test_identity_falls_back_to_user_map(monkeypatch):
+def test_identity_exchanges_via_backend(monkeypatch):
+    """SLACK_USER_MAP의 직원 id를 실어 백엔드 /auth/slack-exchange로 토큰을 받고, 백엔드 not_found는 그대로 올린다."""
     identity._cache.clear()
     monkeypatch.setenv("SLACK_USER_MAP", '{"U_MKT01": "emp_mkt_01"}')
-    monkeypatch.setattr(identity, "backend", lambda *a, **k: (_ for _ in ()).throw(api.ApiError("not_found", "no route")))
-    monkeypatch.setattr(identity, "_dev_login", lambda emp_id: (f"dev.{emp_id}", {"id": emp_id, "role": "employee"}))
+    calls = []
+
+    def fake_backend(method, path, token, json):
+        calls.append((path, json))
+        if json["employee_id"] is None:
+            raise api.ApiError("not_found", "연결된 직원 없음")
+        return {"access_token": "jwt-mkt", "employee": {"id": json["employee_id"], "role": "employee"}}
+
+    monkeypatch.setattr(identity, "backend", fake_backend)
     token, emp = identity.resolve("U_MKT01")
-    assert token == "dev.emp_mkt_01" and emp["id"] == "emp_mkt_01"
+    assert token == "jwt-mkt" and emp["id"] == "emp_mkt_01"
+    assert calls == [("/auth/slack-exchange", {"slack_user_id": "U_MKT01", "employee_id": "emp_mkt_01"})]
     try:
         identity.resolve("U_UNKNOWN")
         raise AssertionError("매핑 없는 사용자는 실패해야 함")
