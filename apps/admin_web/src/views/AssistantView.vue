@@ -3,7 +3,8 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { createTask, getTasks, errorLabel } from '../request.js'
-import { QUICK, TASK_STATUS } from '../labels.js'
+import { getNames, dt } from '../api.js'
+import { QUICK, TASK_STATUS, onTabKeys } from '../labels.js'
 import TaskStream from '../components/TaskStream.vue'
 
 const route = useRoute()
@@ -19,7 +20,14 @@ async function ask(q, promptName, promptArgs) {
     text.value = ''; notice.value = ''
   } catch (e) { notice.value = errorLabel(e) }
 }
-async function loadHistory() { try { history.value = await getTasks(true, 10) } catch { history.value = [] } }
+// 관리자는 '전체 요청'으로 모든 직원의 요청(Slack·웹·시스템)을 본다. 권한은 서버(/ai/tasks?mine=false)가 다시 확인한다.
+const isAdmin = (() => { try { return JSON.parse(localStorage.me || '{}').role === 'admin' } catch { return false } })()
+const CHANNEL = { slack: 'Slack', admin_ui: '웹', system: '시스템' }
+const scope = ref('mine'), channel = ref(''), names = ref(new Map())
+async function loadHistory() {
+  try { history.value = await getTasks(scope.value === 'mine', scope.value === 'mine' ? 10 : 100) } catch { history.value = [] }
+}
+function setScope(s) { scope.value = s; loadHistory(); if (s === 'all') getNames().then((n) => (names.value = n)) }
 onMounted(() => {
   loadHistory()
   if (route.query.q) ask(String(route.query.q), route.query.prompt, route.query.anomaly ? { anomaly_id: route.query.anomaly } : undefined)
@@ -46,9 +54,18 @@ onMounted(() => {
   </section>
   <TaskStream v-for="t in tasks" :key="t.key" :task-id="t.id" @done="loadHistory" @approval="loadHistory" />
   <section class="card" aria-labelledby="hist-h">
-    <h2 id="hist-h">내 요청</h2>
-    <details v-for="t in history" :key="t.task_id" class="small">
-      <summary>{{ t.created_at.slice(5, 16).replace('T', ' ') }} · {{ TASK_STATUS[t.status] ?? t.status }} · {{ t.input.slice(0, 60) }}</summary>
+    <h2 id="hist-h">{{ scope === 'mine' ? '내 요청' : '전체 요청' }}</h2>
+    <div v-if="isAdmin" class="tags" style="gap: 8px; align-items: center">
+      <div role="tablist" aria-label="요청 범위" class="segment" @keydown="onTabKeys">
+        <button type="button" role="tab" :aria-selected="scope === 'mine'" :tabindex="scope === 'mine' ? 0 : -1" @click="setScope('mine')">내 요청</button>
+        <button type="button" role="tab" :aria-selected="scope === 'all'" :tabindex="scope === 'all' ? 0 : -1" @click="setScope('all')">전체 요청</button>
+      </div>
+      <label v-if="scope === 'all'" class="small">경로
+        <select v-model="channel"><option value="">전체</option><option v-for="(l, c) in CHANNEL" :key="c" :value="c">{{ l }}</option></select>
+      </label>
+    </div>
+    <details v-for="t in history.filter((x) => !channel || x.channel === channel)" :key="t.task_id" class="small">
+      <summary>{{ dt(t.created_at) }} · <template v-if="scope === 'all'">{{ CHANNEL[t.channel] ?? t.channel }} · {{ names.get(t.requester_id) ?? t.requester_id }} · </template>{{ TASK_STATUS[t.status] ?? t.status }} · {{ t.input.slice(0, 60) }}</summary>
       <p v-if="t.result" style="white-space: pre-wrap; line-height: 1.6">{{ t.result.answer }}</p>
       <p v-if="t.error" style="color: #b00020">{{ t.error }}</p>
     </details>

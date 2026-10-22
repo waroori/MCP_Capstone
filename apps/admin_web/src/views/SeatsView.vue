@@ -161,9 +161,6 @@ function pickFloor(id) { floorId.value = id; selectedId.value = '' }
 </template>
 
 <style scoped>
-.segment { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
-.segment button { min-height: 40px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; font-size: 14px; }
-.segment button[aria-selected='true'] { background: var(--ink); color: var(--white); font-weight: 600; }
 .filter { gap: 8px; }
 .card-head > .legend { flex-direction: row; }
 .tool-chip { display: inline-flex; align-items: center; gap: 8px; padding-left: 8px; }

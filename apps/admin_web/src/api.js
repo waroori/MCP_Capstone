@@ -3,7 +3,8 @@
 import { get, post, put, request, createTask } from './request.js'
 import { PLAN_TYPE, PLAN_STATUS, BILLING, TOOL_LABEL, cap } from './labels.js'
 
-const dt = (s) => (s ? s.slice(5, 16).replace('T', ' ') : '')
+// 서버 시각은 UTC('…Z'). 화면은 한국 시간 'MM-DD HH:mm' (sv-SE 형식이 'YYYY-MM-DD HH:mm:ss')
+export const dt = (s) => (s ? new Date(s).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5, 16) : '')
 const daysAgo = (s) => (s ? `${Math.max(0, Math.round((Date.now() - new Date(s)) / 86400000))}일 전` : '기록 없음')
 
 // 화면에 ID 대신 이름을 보이기 위한 사전: 직원·계약(제품)·제품·모델·프로젝트. 세션 동안 한 번만 받는다.

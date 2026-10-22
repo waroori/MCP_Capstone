@@ -112,3 +112,8 @@ button { cursor: pointer; }
 .feed-title { font-size: 15px; font-weight: 600; }
 
 .status { font-size: 13px; padding: 10px 14px; border-radius: 10px; background: var(--lime); }
+
+/* 탭(role=tablist). 승인 대기·좌석 배치도·AI 비서가 같이 쓴다. 키보드는 labels.js onTabKeys */
+.segment { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
+.segment button { min-height: 40px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; font-size: 14px; }
+.segment button[aria-selected='true'] { background: var(--ink); color: var(--white); font-weight: 600; }

@@ -135,9 +135,6 @@ async function decide(fn, verb) {
 </template>
 
 <style scoped>
-.segment { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--white); border: 1px solid var(--line); }
-.segment button { min-height: 40px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; font-size: 14px; }
-.segment button[aria-selected='true'] { background: var(--ink); color: var(--white); font-weight: 600; }
 .list-item { text-align: left; border: 1px solid var(--line); border-radius: 14px; background: var(--white); padding: 17px; display: flex; flex-direction: column; gap: 8px; }
 .list-item:hover { border-color: var(--line-strong); }
 .list-item[aria-current='true'] { border: 2px solid var(--ink); padding: 16px; }
