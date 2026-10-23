@@ -71,14 +71,24 @@ def slack_id_for(emp: dict) -> str | None:
 
 
 def mapped_employees() -> list[dict]:
-    """SLACK_USER_MAP에 연결된 직원들 (부서·전사 대상 제안을 DM으로 보낼 때 씀)."""
-    out = []
+    """부서·전사 대상 제안을 DM으로 보낼 직원들: SLACK_USER_MAP에 연결된 직원 + DB에 실제 Slack ID가 있는 재직 직원(회사 설정·seed_team으로 등록).
+    예전에는 매핑표만 봐서 .env에 적힌 두어 명에게만 갔다. 시스템 계정·퇴사자는 뺀다. 같은 직원은 한 번만."""
+    out: dict[str, dict] = {}
     for emp_id in dict.fromkeys(identity._user_map().values()):
         try:
-            out.append(employee(emp_id))
+            out[emp_id] = employee(emp_id)
         except api.ApiError as exc:
             log.warning("직원 %s 조회 실패: %s", emp_id, exc)
-    return out
+    try:
+        for m in api.backend("GET", "/org/members", SYSTEM_TOKEN):
+            e = m["employee"]
+            if e["id"] in out or e.get("role") == "system" or e.get("status") == "resigned" or not slack_id_for(e):
+                continue
+            out[e["id"]] = e
+            _emp_cache.setdefault(e["id"], e)
+    except api.ApiError as exc:
+        log.warning("직원 목록 조회 실패(매핑표만 씀): %s", exc)
+    return list(out.values())
 
 
 def _dm(client, slack_id: str) -> str:

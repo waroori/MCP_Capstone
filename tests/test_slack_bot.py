@@ -173,8 +173,28 @@ def _fake_backend(calls, outbox_delivered):
             return [{"id": "tool_chatgpt", "vendor": "OpenAI", "product": "ChatGPT Enterprise", "contract": {"id": "ctr_chatgpt_2026", "plan_name": "Enterprise (seat + usage)"}}]
         if path.startswith("/internal/jobs/"):
             return {"result": {"stub": True}}
+        if path == "/org/members":  # 전사·부서 대상: DB에 실제 Slack ID가 있는 재직 직원. 가짜 ID(U_FAKE)·시스템·퇴사자는 빠진다
+            return [{"employee": emp, "tools": []},
+                    {"employee": {"id": "emp_cs_02", "name": "정서현", "dept_id": "dept_cs", "role": "employee", "status": "active", "job_title": "CS 상담", "slack_user_id": "U0CAF7Z7PRD"}, "tools": []},
+                    {"employee": {"id": "emp_md_02", "name": "정윤지", "dept_id": "dept_md", "role": "employee", "status": "active", "job_title": "상품기획", "slack_user_id": "U0CARE0JF29"}, "tools": []},
+                    {"employee": {"id": "sys", "name": "system", "dept_id": "dept_mgmt", "role": "system", "status": "active", "slack_user_id": "U0SYS000001"}, "tools": []},
+                    {"employee": {"id": "emp_old", "name": "퇴사자", "dept_id": "dept_cs", "role": "employee", "status": "resigned", "slack_user_id": "U0OLD000001"}, "tools": []}]
         raise AssertionError(f"예상 못 한 호출 {method} {path}")
     return backend
+
+
+def test_broadcast_targets_include_db_slack_ids(monkeypatch):
+    """전사(all)·부서(team) 카드의 받는 사람: .env 매핑표에 없어도 DB에 실제 Slack ID가 있는 재직 직원이면 받는다.
+    (seed_team 회사는 매핑표가 비어 있어 두어 명에게만 가던 문제.) 시스템 계정·퇴사자·가짜 ID는 제외."""
+    from apps.slack_bot import worker
+    monkeypatch.setattr(api, "backend", _fake_backend([], []))
+    monkeypatch.setattr(identity, "_user_map", lambda: {"U0REAL0001": "emp_sales_09"})
+    worker._emp_cache.clear()
+    ids = [e["id"] for e in worker._targets({"target_type": "all"})]
+    assert ids == ["emp_sales_09", "emp_cs_02", "emp_md_02"]  # 매핑표 1명 + DB 2명, sys·퇴사자 제외
+    assert [e["id"] for e in worker._targets({"target_type": "team", "target_id": "dept_cs"})] == ["emp_cs_02"]
+    monkeypatch.setattr(identity, "_user_map", lambda: {})  # 매핑표가 비어도 DB로 간다
+    assert [e["id"] for e in worker._targets({"target_type": "all"})] == ["emp_cs_02", "emp_md_02"]
 
 
 def test_worker_sends_confirmation_dm_once_and_delivers_outbox(monkeypatch, tmp_path):
