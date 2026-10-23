@@ -1587,7 +1587,10 @@ def _vendor_model_list(simulate: bool, now: datetime) -> tuple[list[dict], list[
     else:
         listed, errors = [{"model": m, "known": True} for m in MODEL_CATALOG.values() if m.vendor in approved], []
     nxt = next((r for r in MOCK_RELEASES if r["model"].vendor in approved and r["model"].id not in known), None)
-    return listed + ([{**nxt, "known": False}] if simulate and nxt else []), errors
+    if simulate and nxt:  # Mock의 tool_id는 시드 기준이다. 셋팅으로 만든 회사는 제품 id가 달라 이 회사의 같은 공급사 제품으로 바꾼다
+        t = approved[nxt["model"].vendor]
+        listed.append({**nxt, "tool_id": t["id"], "plans": [t["product"]], "known": False})
+    return listed, errors
 
 
 def _job_collect_release_notes(now: datetime, simulate: bool = False) -> dict:

@@ -26,3 +26,6 @@ def test_team_company_built_through_setup_api():
     assert db.one("SELECT count(*) AS n FROM models WHERE approved AND tool_id IS NULL")["n"] == 0  # ChatGPT 좌석 모델도 제품에 묶인다
     login = client.post("/auth/login", json={"login_id": "seungwoo.choi@hanbit.example", "password": "test-pass-1234"})
     assert login.status_code == 200 and login.json()["data"]["employee"]["role"] == "admin"
+    sim = client.post("/internal/jobs/collect_release_notes/run?simulate=true", headers={"Authorization": "Bearer dev.sys"})
+    assert sim.status_code == 200, sim.text  # Mock 새 모델의 tool_id(시드 기준 tool_chatgpt)가 아니라 이 회사의 제품 id로 들어가야 한다
+    assert db.one("SELECT t.product FROM models m JOIN tools t ON t.id = m.tool_id WHERE m.id = 'openai:gpt-5.6'")["product"] == "ChatGPT Enterprise"
