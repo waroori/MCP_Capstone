@@ -273,6 +273,11 @@ scripts/run_public.sh
 | 이름 | 역할 | 주요 기여 |
 | --- | --- | --- |
 | 채석현 | R1 - PM·PO / R5 - Frontend·Demo | 서비스 기획, HRD 관리자·실무진 페르소나 및 사용자 시나리오 작성, 관리자 웹 UI·UX 디자인, 시연 영상 촬영 |
+| 정서현 | R1 - PM·PO / R6 - QA·Eval | 서비스 기획, Scrum Master, 최종 발표 |
+| 정윤지 | R1 - PM·PO | 서비스 기획, PM(일정·범위 관리) |
+| 유정연 | R4 - Backend·Tool / R6 - QA·Eval | 업무·문서 MCP 서버 구현(도구 22개·3개)과 MCP Prompt·정책 정리, 하네스 입력 경계(기능과 무관한 요청 거부), `docker compose up -d` 한 번 실행 구성, QA 검증 |
+| 이용주 | R2 - AI Engineer(흐름) / R5 - Frontend·Demo | Slack 봇 워커(F1 자동 제안·사용 의사 확인 DM)와 승인 결과 답장, 관리자 웹 화면(비용·사용량, 좌석 패널, 해결책 선택 카드), F1 새 모델 시뮬레이션 보정, 회수 검증 보강 |
+| 최승우 (개발 리드) | R4 - Backend·Tool | DB 스키마·시드·ERD, JWT 로그인·권한, FastAPI backend와 `/ai/tasks` 중계, PostgreSQL agent 스키마, Docker·Cloudflare 실행·배포 스크립트, F1 새 모델 카드 뉴스, F3·F4 흐름 |
 
 ## 참고 문서
 
